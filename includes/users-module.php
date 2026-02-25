@@ -2211,81 +2211,80 @@ add_shortcode('acme_view_user', function () {
 
     ob_start(); ?>
 
-    <div style="max-width:820px;margin:0 auto;">
-        <div
-            style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px">
-            <!--<h4 style="margin:10px">Usuário: <?php #echo esc_html($u->user_login); 
-                                                    ?></h4>-->
-            <!--<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">-->
-            <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-left:auto"></div>
-            <a href="<?php echo site_url('/usuarios/'); ?>" style="text-decoration:none; ">← Voltar</a>
+    <div style="max-width:1100px;margin:0 auto;padding:12px 16px 24px;">
 
-            <a href="<?php echo esc_url($edit_url); ?>"
-                style="display:inline-block;padding:10px 14px;border-radius:8px;background:#2d6cdf;color:#fff;text-decoration:none; ">
-                Editar
-            </a>
+        <div style="background:#fff;border:1px solid rgba(15,23,42,.08);border-radius:18px;padding:18px;margin-bottom:14px;">
+
+            <!-- HEADER: título + botões alinhados -->
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px;">
+                <h3 style="margin:0;font-size:16px;font-weight:700;line-height:1.2;">Dados do usuário</h3>
+
+                <div style="margin-left:auto;display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+                    <a href="<?php echo esc_url(site_url('/usuarios/')); ?>"
+                        style="border:1px solid rgba(15,23,42,.10);background:#fff;border-radius:14px;padding:10px 14px;font-weight:700;font-size:14px;white-space:nowrap;text-decoration:none;color:#0f172a;">
+                        ← Voltar
+                    </a>
+
+                    <a href="<?php echo esc_url($edit_url); ?>"
+                        style="border:1px solid rgba(15,23,42,.10);background:rgba(15,23,42,.04);border-radius:14px;padding:10px 14px;font-weight:700;font-size:14px;white-space:nowrap;text-decoration:none;color:#0f172a;">
+                        Editar
+                    </a>
+                </div>
+            </div>
+
+            <!-- CONTEÚDO -->
+            <table style="width:100%;border-collapse:collapse">
+                <tbody>
+                    <tr>
+                        <td style="padding:10px;border-bottom:1px solid #eee;width:220px"><strong>ID</strong></td>
+                        <td style="padding:10px;border-bottom:1px solid #eee"><?php echo (int) $u->ID; ?></td>
+                    </tr>
+                    <tr>
+                        <td style="padding:10px;border-bottom:1px solid #eee"><strong>Nome</strong></td>
+                        <td style="padding:10px;border-bottom:1px solid #eee"><?php echo esc_html($u->display_name); ?></td>
+                    </tr>
+                    <tr>
+                        <td style="padding:10px;border-bottom:1px solid #eee"><strong>Usuário</strong></td>
+                        <td style="padding:10px;border-bottom:1px solid #eee"><?php echo esc_html($u->user_login); ?></td>
+                    </tr>
+                    <tr>
+                        <td style="padding:10px;border-bottom:1px solid #eee"><strong>E-mail</strong></td>
+                        <td style="padding:10px;border-bottom:1px solid #eee"><?php echo esc_html($u->user_email); ?></td>
+                    </tr>
+                    <tr>
+                        <td style="padding:10px;border-bottom:1px solid #eee"><strong>Telefone</strong></td>
+                        <td style="padding:10px;border-bottom:1px solid #eee"><?php echo $phone ? esc_html($phone) : '—'; ?></td>
+                    </tr>
+                    <tr>
+                        <td style="padding:10px;border-bottom:1px solid #eee"><strong>Perfil</strong></td>
+                        <td style="padding:10px;border-bottom:1px solid #eee"><?php echo esc_html($profile_front_label); ?></td>
+                    </tr>
+                    <tr>
+                        <td style="padding:10px;border-bottom:1px solid #eee"><strong>Situação</strong></td>
+                        <td style="padding:10px;border-bottom:1px solid #eee">
+                            <?php echo ($st === 'inactive')
+                                ? '<span style="color:#b00020;font-weight:700">Inativo</span>'
+                                : '<span style="color:#0a7a2f;font-weight:700">Ativo</span>'; ?>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding:10px;border-bottom:1px solid #eee"><strong>Créditos ativos</strong></td>
+                        <td style="padding:10px;border-bottom:1px solid #eee"><?php echo (int) $credits_active; ?></td>
+                    </tr>
+                    <tr>
+                        <td style="padding:10px;border-bottom:1px solid #eee"><strong>Registrado em</strong></td>
+                        <td style="padding:10px;border-bottom:1px solid #eee;">
+                            <?php echo $u->user_registered ? esc_html(date_i18n('d/m/Y H:i:s', strtotime($u->user_registered))) : ''; ?>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <p style="margin:12px 0 0 0;opacity:.75;">
+                * Para editar telefone/senha/status, use o botão <strong>Editar</strong>.
+            </p>
+
         </div>
-    </div>
-
-    <div style="border:1px solid #e5e7eb;border-radius:12px;padding:16px; background-color: #fff;">
-        <h3 style="margin-top:0">Dados</h3>
-
-        <table style="width:100%;border-collapse:collapse">
-            <tbody>
-                <tr>
-                    <td style="padding:10px;border-bottom:1px solid #eee;width:220px"><strong>ID</strong></td>
-                    <td style="padding:10px;border-bottom:1px solid #eee"><?php echo (int) $u->ID; ?></td>
-                </tr>
-                <tr>
-                    <td style="padding:10px;border-bottom:1px solid #eee"><strong>Nome</strong></td>
-                    <td style="padding:10px;border-bottom:1px solid #eee"><?php echo esc_html($u->display_name); ?></td>
-                </tr>
-                <tr>
-                    <td style="padding:10px;border-bottom:1px solid #eee"><strong>Usuário</strong></td>
-                    <td style="padding:10px;border-bottom:1px solid #eee"><?php echo esc_html($u->user_login); ?></td>
-                </tr>
-                <tr>
-                    <td style="padding:10px;border-bottom:1px solid #eee"><strong>E-mail</strong></td>
-                    <td style="padding:10px;border-bottom:1px solid #eee"><?php echo esc_html($u->user_email); ?></td>
-                </tr>
-                <tr>
-                    <td style="padding:10px;border-bottom:1px solid #eee"><strong>Telefone</strong></td>
-                    <td style="padding:10px;border-bottom:1px solid #eee"><?php echo $phone ? esc_html($phone) : '—'; ?>
-                    </td>
-                </tr>
-                <tr>
-                    <td style="padding:10px;border-bottom:1px solid #eee"><strong>Perfil</strong></td>
-                    <td style="padding:10px;border-bottom:1px solid #eee"><?php echo esc_html($profile_front_label); ?></td>
-                </tr>
-                <tr>
-                    <td style="padding:10px;border-bottom:1px solid #eee"><strong>Situação</strong></td>
-                    <td style="padding:10px;border-bottom:1px solid #eee">
-                        <?php echo ($st === 'inactive')
-                            ? '<span style="color:#b00020;font-weight:700">Inativo</span>'
-                            : '<span style="color:#0a7a2f;font-weight:700">Ativo</span>'; ?>
-                    </td>
-                </tr>
-
-                <tr>
-                    <td style="padding:10px;border-bottom:1px solid #eee"><strong>Créditos ativos</strong></td>
-                    <td style="padding:10px;border-bottom:1px solid #eee">
-                        <?php echo (int) $credits_active; ?>
-                    </td>
-                </tr>
-
-                <tr>
-                    <td style="padding:10px;border-bottom:1px solid #eee"><strong>Registrado em</strong></td>
-                    <td style="padding:10px;border-bottom:1px solid #eee;">
-                        <?php echo esc_html($u->user_registered) ? date_i18n('d/m/Y H:i:s', strtotime(esc_html($u->user_registered))) : ''; ?>
-                    </td>
-                </tr>
-            </tbody>
-        </table>
-
-        <p style="margin:12px 0 0 0;opacity:.75; ">
-            * Para editar telefone/senha/status, use o botão <strong>Editar</strong>.
-        </p>
-    </div>
     </div>
 
 <?php
@@ -2965,7 +2964,7 @@ function acme_shortcode_grant_credits()
                     $target_user = get_user_by('id', $target_id);
                     $target_name = $target_user ? $target_user->display_name : ('#' . $target_id);
                 }
-                $target_id ? var_dump($target_id) : '';
+                //$target_id ? var_dump($target_id) : '';
                 ?>
                 <?php if (isset($target_id)) : ?>
 
@@ -2973,7 +2972,7 @@ function acme_shortcode_grant_credits()
                         <label
                             style="display:block;font-size:12px;margin-bottom:6px;color:#64748b;font-weight:900;">Usuário</label>
                         <select name="user_id" required class="acme-inp">
-                          
+
                             <option value="<?php echo (int) $target_id; ?>">
                                 <?php echo esc_html($target_name); ?>
                             </option>
@@ -2981,7 +2980,7 @@ function acme_shortcode_grant_credits()
                         </select>
                     </div>
                 <?php else: ?>
-                <!--===========================================-->
+                    <!--===========================================-->
                     <div>
                         <label
                             style="display:block;font-size:12px;margin-bottom:6px;color:#64748b;font-weight:900;">Usuário</label>

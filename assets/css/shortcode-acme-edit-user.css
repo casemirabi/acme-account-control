@@ -122,3 +122,16 @@
   font-size: 12px;
   opacity: .75;
 }
+
+.acme-eu-actions{
+  margin-left: auto;
+  display:flex;
+  gap:10px;
+  align-items:center;
+  flex-wrap:wrap;
+}
+
+/* se o tema centraliza h3, isso corrige */
+.acme-eu-card__title{
+  text-align: left;
+}

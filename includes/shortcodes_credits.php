@@ -452,7 +452,7 @@ function acme_shortcode_user_subscriptions()
   if ($is_admin) {
     $target_user_id = isset($_GET['user_id']) ? (int) $_GET['user_id'] : 0;
     if ($target_user_id <= 0) {
-      return '<p>Informe o usuário na URL: <code>?user_id=123</code></p>';
+      return '<p>Usuário não identificado.</code></p>';
     }
   } elseif (isset($_GET['user_id'])) {
     $target_user_id = isset($_GET['user_id']) ? (int) $_GET['user_id'] : 0;
@@ -488,7 +488,7 @@ function acme_shortcode_user_subscriptions()
   }
 
   // paginação simples
-  $per_page = 20;
+  $per_page = 5;//20;
   $page = isset($_GET['pg']) ? max(1, (int) $_GET['pg']) : 1;
   $offset = ($page - 1) * $per_page;
 
@@ -562,7 +562,7 @@ function acme_shortcode_user_subscriptions()
               style="opacity:.6;font-weight:600">(#<?php echo (int) $u->ID; ?>)</span>
           </div>
           <?php if (!$is_child): ?>
-            <div style="margin-top:6px;color:#8a5a00">Atenção: este usuário não é “Master”. Assinaturas
+            <div style="margin-top:6px;color:#8a5a00">Atenção: Assinaturas
               normalmente são apenas para master.</div>
           <?php endif; ?>
         </div>
@@ -1103,13 +1103,13 @@ function acme_shortcode_user_subscriptions2()
           <?php if (!$is_child && !$is_admin): ?>
 
             <div style="margin-top:6px;color:#8a5a00">
-              Atenção: este usuário não é “Master”. Assinaturas normalmente são apenas para master.
+              Atenção: Assinaturas normalmente são apenas para master.
             </div>
           <?php endif; ?>
 
           <?php if ($is_admin): ?>
             <div style="margin-top:6px;color:#8a5a00">
-              Atenção: este usuário é “Administrador”. Assinaturas são apenas para master.
+              Atenção: Assinaturas são apenas para master.
             </div>
           <?php endif; ?>
         </div>
