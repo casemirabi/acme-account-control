@@ -2176,7 +2176,7 @@ add_shortcode('acme_add_user', function () {
 
     // Layout em coluna (um abaixo do outro), mantendo o design do painel
 ?>
-    <div class="acme-panel" style="max-width:auto;margin:0 auto;">
+    <div class="acme-panel" style="max-width:auto;margin:0 auto ; ">
 
         <div class="acme-panel-h">
             <div>
@@ -2200,7 +2200,7 @@ add_shortcode('acme_add_user', function () {
             </div>
         <?php endif; ?>
 
-        <form method="post"
+        <form method="post" class="form-add-user"
             action="<?php echo esc_url(admin_url('admin-post.php')); ?>"
             style="padding:12px 16px;border-top:1px solid #eef2f7;"
             class="acme-form-col">
@@ -2208,7 +2208,7 @@ add_shortcode('acme_add_user', function () {
             <input type="hidden" name="action" value="acme_fe_create_user">
             <?php wp_nonce_field('acme_fe_create_user'); ?>
 
-            <div class="acme-field">
+            <div class="acme-field" style="margin-bottom:1%">
                 <label class="acme-muted">Tipo de usuário</label>
                 <select name="role" required class="acme-input">
                     <?php if (in_array('grandchild', $allowed_roles, true)): ?>
@@ -2221,7 +2221,7 @@ add_shortcode('acme_add_user', function () {
             </div>
 
             <?php if ($is_admin): ?>
-                <div class="acme-field">
+                <div class="acme-field" style="margin-bottom:1%">
                     <label class="acme-muted">Master responsável (somente se for Sub-Login)</label>
                     <select name="parent_child_id" class="acme-input">
                         <option value="">Selecione (obrigatório para Neto)</option>
@@ -2237,22 +2237,22 @@ add_shortcode('acme_add_user', function () {
                 </div>
             <?php endif; ?>
 
-            <div class="acme-field">
+            <div class="acme-field" style="margin-bottom:1%">
                 <label class="acme-muted">Nome</label>
                 <input type="text" name="display_name" required class="acme-input">
             </div>
 
-            <div class="acme-field">
+            <div class="acme-field" style="margin-bottom:1%">
                 <label class="acme-muted">E-mail</label>
                 <input type="email" name="email" required class="acme-input">
             </div>
 
-            <div class="acme-field">
+            <div class="acme-field" style="margin-bottom:1%">
                 <label class="acme-muted">Telefone</label>
                 <input type="text" name="phone" placeholder="+5511999999999" class="acme-input">
             </div>
 
-            <div class="acme-field">
+            <div class="acme-field" style="margin-bottom:1%">
                 <label class="acme-muted">Senha</label>
                 <input type="password" name="password" required minlength="8" class="acme-input">
                 <div class="acme-muted" style="margin-top:6px;opacity:.85;">Mínimo 8 caracteres.</div>

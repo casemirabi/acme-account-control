@@ -1659,7 +1659,7 @@ add_shortcode('acme_clt_panel', function () {
   if ($f_elegibilidade === 'Elegivel') {
     $where[] = "(
       t.status != 'pending'
-      AND t.error_code != 'nao_elegivel'
+      AND (t.error_code IS NULL OR t.error_code <> 'nao_elegivel')
       AND NOT (t.status = 'completed' AND (t.response_json IS NULL OR t.response_json = ''))
     )";
   }
@@ -1757,64 +1757,64 @@ add_shortcode('acme_clt_panel', function () {
   $out .= '<a class="acme-btn" href="' . esc_url(add_query_arg([], $base_url)) . '">Atualizar</a>';
   $out .= '<a class="acme-btn" href="' . $clear_url . '">Limpar filtros</a>';
   $out .= do_shortcode('[acme_clt_panel_export label="Baixar Relatório" class="acme-btn"]');
-$out .= '<button class="acme-btn-icon" type="submit" form="acme-clt-filter-form" aria-label="Pesquisar">';
-$out .= '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true">'
-      . '<path d="M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" stroke="currentColor" stroke-width="2" />'
-      . '<path d="M16.5 16.5 21 21" stroke="currentColor" stroke-width="2" stroke-linecap="round" />'
-      . '</svg>';
-$out .= '</button>';
+  $out .= '<button class="acme-btn-icon" type="submit" form="acme-clt-filter-form" aria-label="Pesquisar">';
+  $out .= '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true">'
+    . '<path d="M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" stroke="currentColor" stroke-width="2" />'
+    . '<path d="M16.5 16.5 21 21" stroke="currentColor" stroke-width="2" stroke-linecap="round" />'
+    . '</svg>';
+  $out .= '</button>';
   $out .= '</div>';
   $out .= '</div>';
 
   // ===== Filtros (GET) =====
   // ===== Filtros (GET) =====
-$out .= '<div class="acme-panel-filters">';
-$out .= '<form id="acme-clt-filter-form" method="get" action="' . esc_url($base_url) . '" class="acme-filter-grid">'; //$out .= '<form method="get" action="' . esc_url($base_url) . '" class="acme-filter-grid">';
+  $out .= '<div class="acme-panel-filters">';
+  $out .= '<form id="acme-clt-filter-form" method="get" action="' . esc_url($base_url) . '" class="acme-filter-grid">'; //$out .= '<form method="get" action="' . esc_url($base_url) . '" class="acme-filter-grid">';
 
-// Quando filtra, sempre volta para a página 1
-$out .= '<input type="hidden" name="clt_page" value="1" />';
+  // Quando filtra, sempre volta para a página 1
+  $out .= '<input type="hidden" name="clt_page" value="1" />';
 
-// Linha única: 5 campos + botão (igual print)
-$out .= '<div class="acme-filter-row-6">';
+  // Linha única: 5 campos + botão (igual print)
+  $out .= '<div class="acme-filter-row-6">';
 
-$out .= '<div class="acme-field">';
-$out .= '<label class="acme-muted">Status</label>';
-$out .= '<select class="acme-input" name="clt_status">';
-$out .= '<option value="">Todos</option>';
-foreach ($allowed_status as $st) {
-  $out .= '<option value="' . esc_attr($st) . '"' . selected($f_status, $st, false) . '>' . esc_html($st) . '</option>';
-}
-$out .= '</select>';
-$out .= '</div>';
+  $out .= '<div class="acme-field">';
+  $out .= '<label class="acme-muted">Status</label>';
+  $out .= '<select class="acme-input" name="clt_status">';
+  $out .= '<option value="">Todos</option>';
+  foreach ($allowed_status as $st) {
+    $out .= '<option value="' . esc_attr($st) . '"' . selected($f_status, $st, false) . '>' . esc_html($st) . '</option>';
+  }
+  $out .= '</select>';
+  $out .= '</div>';
 
-$out .= '<div class="acme-field">';
-$out .= '<label class="acme-muted">Elegibilidade</label>';
-$out .= '<select class="acme-input" name="clt_elegibilidade">';
-$out .= '<option value="">Todos</option>';
-$out .= '<option value="Elegivel"' . selected($f_elegibilidade, 'Elegivel', false) . '>Elegível</option>';
-$out .= '<option value="NaoElegivel"' . selected($f_elegibilidade, 'NaoElegivel', false) . '>Não Elegível</option>';
-$out .= '</select>';
-$out .= '</div>';
+  $out .= '<div class="acme-field">';
+  $out .= '<label class="acme-muted">Elegibilidade</label>';
+  $out .= '<select class="acme-input" name="clt_elegibilidade">';
+  $out .= '<option value="">Todos</option>';
+  $out .= '<option value="Elegivel"' . selected($f_elegibilidade, 'Elegivel', false) . '>Elegível</option>';
+  $out .= '<option value="NaoElegivel"' . selected($f_elegibilidade, 'NaoElegivel', false) . '>Não Elegível</option>';
+  $out .= '</select>';
+  $out .= '</div>';
 
-$out .= '<div class="acme-field">';
-$out .= '<label class="acme-muted">CPF</label>';
-$out .= '<input class="acme-input" type="text" name="clt_cpf" value="' . esc_attr($f_cpf_raw) . '" placeholder="ex.: 94132038653 ou 941.***" />';
-$out .= '</div>';
+  $out .= '<div class="acme-field">';
+  $out .= '<label class="acme-muted">CPF</label>';
+  $out .= '<input class="acme-input" type="text" name="clt_cpf" value="' . esc_attr($f_cpf_raw) . '" placeholder="ex.: 94132038653 ou 941.***" />';
+  $out .= '</div>';
 
-$out .= '<div class="acme-field">';
-$out .= '<label class="acme-muted">Data (de)</label>';
-$out .= '<input class="acme-input" type="date" name="clt_date_from" value="' . esc_attr($f_date_from) . '" />';
-$out .= '</div>';
+  $out .= '<div class="acme-field">';
+  $out .= '<label class="acme-muted">Data (de)</label>';
+  $out .= '<input class="acme-input" type="date" name="clt_date_from" value="' . esc_attr($f_date_from) . '" />';
+  $out .= '</div>';
 
-$out .= '<div class="acme-field">';
-$out .= '<label class="acme-muted">Data (até)</label>';
-$out .= '<input class="acme-input" type="date" name="clt_date_to" value="' . esc_attr($f_date_to) . '" />';
-$out .= '</div>';
+  $out .= '<div class="acme-field">';
+  $out .= '<label class="acme-muted">Data (até)</label>';
+  $out .= '<input class="acme-input" type="date" name="clt_date_to" value="' . esc_attr($f_date_to) . '" />';
+  $out .= '</div>';
 
 
-$out .= '</form>';
-$out .= '</div>'; // panel-filters
-$out .= '<br>';
+  $out .= '</form>';
+  $out .= '</div>'; // panel-filters
+  $out .= '<br>';
   if (empty($rows)) {
     $out .= '<div style="padding:14px 16px;color:#64748b;">Nenhuma consulta encontrada com esses filtros.</div>';
     $out .= '</div>';
