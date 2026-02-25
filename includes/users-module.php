@@ -1576,62 +1576,62 @@ add_shortcode('acme_my_grandchildren_manage', function ($atts) {
 
             <form id="acme-users-filter-form" method="get" class="acme-filter-grid"><!--<form method="get" class="acme-filter-grid">-->
 
-            <!-- Linha 1: Buscar + Master -->
-            <div class="acme-filter-row-4">
+                <!-- Linha 1: Buscar + Master -->
+                <div class="acme-filter-row-4">
 
-                <div class="acme-field">
-                    <label class="acme-muted">Buscar (nome, email, telefone)</label>
-                    <input class="acme-input" type="text" name="q"
-                        value="<?php echo esc_attr($q); ?>"
-                        placeholder="Digite para buscar...">
-                </div>
-
-                <div class="acme-field">
-                    <label class="acme-muted">Status</label>
-                    <select class="acme-input" name="status">
-                        <option value="all" <?php selected($filter_status, 'all'); ?>>Todos</option>
-                        <option value="active" <?php selected($filter_status, 'active'); ?>>Ativo</option>
-                        <option value="inactive" <?php selected($filter_status, 'inactive'); ?>>Inativo</option>
-                    </select>
-                </div>
-
-
-
-
-                <!-- Linha 2: Status + Créditos + Filtrar -->
-                <!--<div class="acme-filter-row-2">-->
-
-
-
-                <div class="acme-field">
-                    <label class="acme-muted">Créditos</label>
-                    <select class="acme-input" name="credits">
-                        <option value="all" <?php selected($filter_credits, 'all'); ?>>Todos</option>
-                        <option value="has" <?php selected($filter_credits, 'has'); ?>>Com créditos</option>
-                        <option value="none" <?php selected($filter_credits, 'none'); ?>>Sem créditos</option>
-                    </select>
-                </div>
-
-                <?php if ($is_admin): ?>
                     <div class="acme-field">
-                        <label class="acme-muted">Master (somente Admin)</label>
-                        <select class="acme-input" name="master">
-                            <option value="0">Todos</option>
-                            <?php
-                            $children_for_filter = get_users(['role' => 'child']);
-                            foreach ((array) $children_for_filter as $c) {
-                                echo '<option value="' . (int) $c->ID . '" ' . selected($filter_master, (int) $c->ID, false) . '>' .
-                                    esc_html($c->display_name) . ' (#' . (int) $c->ID . ')</option>';
-                            }
-                            ?>
+                        <label class="acme-muted">Buscar (nome, email, telefone)</label>
+                        <input class="acme-input" type="text" name="q"
+                            value="<?php echo esc_attr($q); ?>"
+                            placeholder="Digite para buscar...">
+                    </div>
+
+                    <div class="acme-field">
+                        <label class="acme-muted">Status</label>
+                        <select class="acme-input" name="status">
+                            <option value="all" <?php selected($filter_status, 'all'); ?>>Todos</option>
+                            <option value="active" <?php selected($filter_status, 'active'); ?>>Ativo</option>
+                            <option value="inactive" <?php selected($filter_status, 'inactive'); ?>>Inativo</option>
                         </select>
                     </div>
-                <?php else: ?>
-                    <div></div>
-                <?php endif; ?>
 
-            </div>
-            <!--</div>-->
+
+
+
+                    <!-- Linha 2: Status + Créditos + Filtrar -->
+                    <!--<div class="acme-filter-row-2">-->
+
+
+
+                    <div class="acme-field">
+                        <label class="acme-muted">Créditos</label>
+                        <select class="acme-input" name="credits">
+                            <option value="all" <?php selected($filter_credits, 'all'); ?>>Todos</option>
+                            <option value="has" <?php selected($filter_credits, 'has'); ?>>Com créditos</option>
+                            <option value="none" <?php selected($filter_credits, 'none'); ?>>Sem créditos</option>
+                        </select>
+                    </div>
+
+                    <?php if ($is_admin): ?>
+                        <div class="acme-field">
+                            <label class="acme-muted">Master (somente Admin)</label>
+                            <select class="acme-input" name="master">
+                                <option value="0">Todos</option>
+                                <?php
+                                $children_for_filter = get_users(['role' => 'child']);
+                                foreach ((array) $children_for_filter as $c) {
+                                    echo '<option value="' . (int) $c->ID . '" ' . selected($filter_master, (int) $c->ID, false) . '>' .
+                                        esc_html($c->display_name) . ' (#' . (int) $c->ID . ')</option>';
+                                }
+                                ?>
+                            </select>
+                        </div>
+                    <?php else: ?>
+                        <div></div>
+                    <?php endif; ?>
+
+                </div>
+                <!--</div>-->
 
             </form>
 
@@ -1804,14 +1804,186 @@ add_shortcode('acme_my_grandchildren_manage', function ($atts) {
 });
 
 
+#CSS DO EDIT USER
+function acme_enqueue_edit_user_shortcode_assets()
+{
+    // Registra, mas NÃO carrega ainda
+    wp_register_style(
+        'acme-shortcode-edit-user',
+        plugin_dir_url(dirname(__FILE__)) . 'assets/css/shortcode-acme-edit-user.css',
+        [],
+        '1.0.0'
+    );
+}
+add_action('wp_enqueue_scripts', 'acme_enqueue_edit_user_shortcode_assets');
+
+function acme_maybe_enqueue_edit_user_assets()
+{
+    // Carrega o CSS quando o shortcode renderizar
+    wp_enqueue_style('acme-shortcode-edit-user');
+}
 
 /**
  * ============================================================
  * 11) SHORTCODE Editar Usuarios (Elementor): [acme_edit_user]
  * ============================================================
  */
-
 add_shortcode('acme_edit_user', function () {
+
+    if (!is_user_logged_in()) {
+        return '<p>Você precisa estar logado.</p>';
+    }
+
+    $actor_id = get_current_user_id();
+    $actor = wp_get_current_user();
+    $is_admin = user_can($actor_id, 'administrator');
+    $is_child = in_array('child', (array) $actor->roles, true);
+
+    if (!$is_admin && !$is_child) {
+        return '<p>Sem permissão.</p>';
+    }
+
+    $target_id = isset($_GET['user_id']) ? (int) $_GET['user_id'] : 0;
+    $nonce = isset($_GET['nonce']) ? (string) $_GET['nonce'] : '';
+
+    // Proteções
+    if ($target_id === acme_master_admin_id() || user_can($target_id, 'administrator')) {
+        return '<p>Este usuário não pode ser editado aqui.</p>';
+    }
+
+    // Filho só edita netos dele
+    if (!$is_admin) {
+        global $wpdb;
+        $links = acme_table_links();
+        $ok = $wpdb->get_var($wpdb->prepare(
+            "SELECT id FROM {$links} WHERE parent_user_id=%d AND child_user_id=%d AND depth=2 LIMIT 1",
+            $actor_id,
+            $target_id
+        ));
+        if (!$ok) {
+            return '<p>Sem permissão para editar este usuário.</p>';
+        }
+    }
+
+    /**
+     * CSS do shortcode (carrega só na página onde ele aparece)
+     * Se você registrou o style com wp_register_style, este enqueue é suficiente.
+     */
+    wp_enqueue_style('acme-shortcode-edit-user');
+
+    $phone = get_user_meta($target_id, 'phone', true);
+
+    // status atual
+    global $wpdb;
+    $statusT = acme_table_status();
+    $st = $wpdb->get_var($wpdb->prepare("SELECT status FROM {$statusT} WHERE user_id=%d", $target_id));
+    $st = $st ?: 'active';
+
+    ob_start(); ?>
+
+    <div class="acme-eu-wrap">
+
+        <?php if (isset($_GET['acme_msg']) && $_GET['acme_msg'] === 'ok'): ?>
+            <div class="acme-eu-alert acme-eu-alert--success">Atualizado com sucesso.</div>
+        <?php endif; ?>
+
+        <!-- TELEFONE -->
+        <section class="acme-eu-card">
+            <header class="acme-eu-card__header">
+                <h3 class="acme-eu-card__title">Telefone</h3>
+            </header>
+
+            <form method="post"
+                action="<?php echo esc_url(admin_url('admin-post.php')); ?>"
+                class="acme-eu-form acme-eu-form--inline">
+                <input type="hidden" name="action" value="acme_fe_update_phone">
+                <input type="hidden" name="user_id" value="<?php echo (int) $target_id; ?>">
+                <?php wp_nonce_field('acme_fe_phone_' . (int) $target_id); ?>
+
+                <label class="acme-eu-field">
+                    <span class="acme-eu-field__control">
+                        <input
+                            type="text"
+                            name="phone"
+                            value="<?php echo esc_attr($phone); ?>"
+                            placeholder="+5511999999999"
+                            class="acme-eu-input">
+                    </span>
+                </label>
+
+                <button type="submit" class="acme-eu-btn acme-eu-btn--primary">Salvar</button>
+            </form>
+        </section>
+
+        <!-- SENHA -->
+        <section class="acme-eu-card">
+            <header class="acme-eu-card__header">
+                <h3 class="acme-eu-card__title">Alterar senha</h3>
+            </header>
+
+            <form method="post"
+                action="<?php echo esc_url(admin_url('admin-post.php')); ?>"
+                class="acme-eu-form acme-eu-form--inline">
+                <input type="hidden" name="action" value="acme_fe_set_password">
+                <input type="hidden" name="user_id" value="<?php echo (int) $target_id; ?>">
+                <?php wp_nonce_field('acme_fe_pass_' . (int) $target_id); ?>
+
+                <label class="acme-eu-field">
+                    <span class="acme-eu-field__control">
+                        <input
+                            type="password"
+                            name="new_pass"
+                            placeholder="Nova senha (mín. 8)"
+                            class="acme-eu-input">
+                    </span>
+                </label>
+
+                <button type="submit" class="acme-eu-btn acme-eu-btn--primary">Salvar</button>
+            </form>
+
+            <p class="acme-eu-hint">A sessão do usuário será encerrada.</p>
+        </section>
+
+        <!-- STATUS -->
+        <section class="acme-eu-card">
+            <header class="acme-eu-card__header">
+                <h3 class="acme-eu-card__title">Situação</h3>
+            </header>
+
+            <?php
+            $acaoStatus = ($st === 'inactive') ? 'activate' : 'deactivate';
+            $classeBotaoStatus = ($st === 'inactive') ? 'acme-eu-btn--success' : 'acme-eu-btn--danger';
+            ?>
+
+            <form method="post"
+                action="<?php echo esc_url(admin_url('admin-post.php')); ?>"
+                class="acme-eu-form">
+                <input type="hidden" name="action" value="acme_fe_toggle_status">
+                <input type="hidden" name="user_id" value="<?php echo (int) $target_id; ?>">
+                <input type="hidden" name="do" value="<?php echo esc_attr($acaoStatus); ?>">
+                <?php wp_nonce_field('acme_fe_toggle_' . (int) $target_id); ?>
+
+                <button type="submit" class="acme-eu-btn <?php echo esc_attr($classeBotaoStatus); ?>">
+                    <?php echo ($st === 'inactive') ? 'Ativar usuário' : 'Inativar usuário'; ?>
+                </button>
+            </form>
+
+            <?php if ($st !== 'inactive'): ?>
+                <p class="acme-eu-hint">
+                    Se este usuário for <strong><?php echo esc_html(acme_role_label('child')); ?></strong>,
+                    a inativação derruba os <strong><?php echo esc_html(acme_role_label('grandchild')); ?></strong>
+                    em cascata.
+                </p>
+            <?php endif; ?>
+        </section>
+
+    </div>
+
+<?php
+    return ob_get_clean();
+});
+
+/*add_shortcode('acme_edit_user', function () {
 
     if (!is_user_logged_in())
         return '<p>Você precisa estar logado.</p>';
@@ -1827,11 +1999,6 @@ add_shortcode('acme_edit_user', function () {
     $target_id = isset($_GET['user_id']) ? (int) $_GET['user_id'] : 0;
     $nonce = isset($_GET['nonce']) ? (string) $_GET['nonce'] : '';
 
-    /*if (!$target_id || !$nonce)
-        return '<p>Usuário inválido.</p>';*/
-
-    /*if (!wp_verify_nonce($nonce, 'acme_edit_user_' . $target_id))
-        return '<p>Link inválido/expirado.</p>';*/
 
     // Proteções
     if ($target_id === acme_master_admin_id() || user_can($target_id, 'administrator')) {
@@ -1851,9 +2018,6 @@ add_shortcode('acme_edit_user', function () {
             return '<p>Sem permissão para editar este usuário.</p>';
     }
 
-    /*$u = get_user_by('id', $target_id);
-    if (!$u)
-        return '<p>Usuário não encontrado.</p>';*/
 
     $phone = get_user_meta($target_id, 'phone', true);
 
@@ -1870,27 +2034,12 @@ add_shortcode('acme_edit_user', function () {
     <div style="max-width:auto;margin:0 auto">
         <div
             style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px">
-            <!--<h2 style="margin:10px; ">Editar usuário</h2>-->
-            <!--<a href="<?php #echo esc_url($back_url); 
-                            ?>" style="margin-left:auto;text-decoration:none">← Voltar</a>-->
+
         </div>
 
         <?php if (isset($_GET['acme_msg']) && $_GET['acme_msg'] === 'ok'): ?>
             <p style="color:green;font-weight:600">Atualizado com sucesso.</p>
         <?php endif; ?>
-
-        <!--<div style="border:1px solid #e5e7eb;border-radius:12px;padding:16px;margin-bottom:14px; ">
-            <p style="margin:0 0 6px 0"><strong>Nome:</strong> <?php #echo esc_html($u->display_name); 
-                                                                ?></p>
-            <p style="margin:0 0 6px 0"><strong>E-mail:</strong> <?php #echo esc_html($u->user_email); 
-                                                                    ?></p>
-            <p style="margin:0"><strong>Status:</strong>
-                <?php #echo $st === 'inactive'
-                #? '<span style="color:#b00020;font-weight:700">Inativo</span>'
-                #: '<span style="color:#0a7a2f;font-weight:700">Ativo</span>'; 
-                ?>
-            </p>
-        </div>-->
 
         <!-- TELEFONE -->
         <div style="border:1px solid #e5e7eb;border-radius:12px;padding:16px;margin-bottom:14px">
@@ -1954,7 +2103,7 @@ add_shortcode('acme_edit_user', function () {
 
 <?php
     return ob_get_clean();
-});
+});*/
 
 
 /**
@@ -2809,18 +2958,44 @@ function acme_shortcode_grant_credits()
                     <input type="hidden" name="grant_type" value="transfer">
                 <?php endif; ?>
 
-                <div>
-                    <label
-                        style="display:block;font-size:12px;margin-bottom:6px;color:#64748b;font-weight:900;">Usuário</label>
-                    <select name="user_id" required class="acme-inp">
-                        <option value="">Selecione...</option>
-                        <?php foreach ($users as $u): ?>
-                            <option value="<?php echo (int) $u->ID; ?>">
-                                <?php echo esc_html($u->display_name . ' (#' . $u->ID . ') - ' . $u->user_email); ?>
+                <!--===========================================-->
+                <?php
+                if (isset($_GET['user_id'])) {
+                    $target_id = (int) $_GET['user_id'];
+                    $target_user = get_user_by('id', $target_id);
+                    $target_name = $target_user ? $target_user->display_name : ('#' . $target_id);
+                }
+                $target_id ? var_dump($target_id) : '';
+                ?>
+                <?php if (isset($target_id)) : ?>
+
+                    <div>
+                        <label
+                            style="display:block;font-size:12px;margin-bottom:6px;color:#64748b;font-weight:900;">Usuário</label>
+                        <select name="user_id" required class="acme-inp">
+                          
+                            <option value="<?php echo (int) $target_id; ?>">
+                                <?php echo esc_html($target_name); ?>
                             </option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
+
+                        </select>
+                    </div>
+                <?php else: ?>
+                <!--===========================================-->
+                    <div>
+                        <label
+                            style="display:block;font-size:12px;margin-bottom:6px;color:#64748b;font-weight:900;">Usuário</label>
+                        <select name="user_id" required class="acme-inp">
+                            <option value="">Selecione...</option>
+                            <?php foreach ($users as $u): ?>
+                                <option value="<?php echo (int) $u->ID; ?>">
+                                    <?php echo esc_html($u->display_name . ' (#' . $u->ID . ') - ' . $u->user_email); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                <?php endif; ?>
+                <!--===========================================-->
 
                 <div>
                     <label
