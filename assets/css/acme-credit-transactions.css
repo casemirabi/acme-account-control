@@ -1,0 +1,196 @@
+/* ========= Base do painel (padrão ACME) ========= */
+.acme-panel {
+  max-width: auto;
+  margin: 18px auto;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, .06);
+  overflow: hidden;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;
+}
+
+.acme-panel-h {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 16px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.acme-panel-title {
+  font-weight: 900;
+  font-size: 16px;
+  color: #0f172a;
+}
+
+.acme-panel-sub {
+  font-size: 13px;
+  color: #64748b;
+}
+
+.acme-btn {
+  display: inline-block;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  text-decoration: none;
+  font-weight: 800;
+  color: #0f172a;
+  cursor: pointer;
+}
+
+.acme-btn:hover {
+  background: #eef2ff;
+}
+
+.acme-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.acme-table th,
+.acme-table td {
+  border-top: 1px solid #f1f5f9;
+  padding: 10px 12px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.acme-table th {
+  background: #f8fafc;
+  color: #334155;
+  font-weight: 900;
+}
+
+.acme-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  color: #334155;
+}
+
+.acme-muted { color: #64748b; }
+
+/* ========= Ações no header ========= */
+.acme-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+/* ========= Corpo do painel (IMPORTANTE: sem fundo azul) ========= */
+.acme-panel-body{
+  padding: 14px 16px;
+  border-top: 1px solid #eef2f7;
+  background: #ffffff !important; /* <- aqui corrige o “azuladinho invertido” */
+}
+
+/* ========= Filtros (grid) ========= */
+.acme-filter-grid {
+  display: grid;
+  gap: 12px;
+}
+
+/* Linha 1: Buscar + Usuário */
+.acme-filter-row-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+/* Linha 2: Serviço + De + Até */
+.acme-filter-row-4 {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1fr;
+  gap: 12px;
+  align-items: end;
+}
+
+/* Mobile: tudo 1 coluna */
+@media (max-width: 720px){
+  .acme-filter-row-2,
+  .acme-filter-row-3{
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ========= Cards dos campos (aqui sim fica o “azuladinho”) ========= */
+.acme-field{
+  background: #f8fafc;          /* <- azulado dentro do card, igual ao print */
+  border: 1px solid #eef2f7;
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.acme-field label{
+  display: block;
+  margin-bottom: 6px;
+}
+
+/* Inputs */
+.acme-input{
+  width: 100% !important;
+  padding: 10px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fff;
+  outline: none;
+  box-sizing: border-box;
+}
+
+/* ========= Barra de ações (botão lupa + Excel) ========= */
+.acme-filter-row-actions{
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+/* Botão redondo com ícone (igual ao print) */
+.acme-btn-icon{
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+}
+.acme-btn-icon:hover{ background:#f8fafc; }
+.acme-btn-icon svg{
+  width: 18px;
+  height: 18px;
+  display:block;
+}
+
+/* ========= Extras de estabilidade ========= */
+.acme-tx-panel * { box-sizing: border-box; }
+.acme-table-wrap{ overflow:auto; }
+
+.acme-empty{
+  padding: 14px 16px;
+  color: #64748b;
+}
+
+.acme-total{ margin: 12px 0 0 0; }
+
+.acme-pagination{
+  padding: 12px 16px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  border-top: 1px solid #f1f5f9;
+}
+.acme-pagination .acme-btn.is-active{
+  background:#111827;
+  color:#fff;
+  border-color:#111827;
+}
