@@ -96,6 +96,52 @@ if (!function_exists('acme_debug_dump')) {
 }
 
 /* ============================================================
+ * 1.1) DÉBITO 1x POR CPF/DIA (por usuário) — helpers
+ * ============================================================
+ *
+ * Regra: o débito deve ocorrer apenas 1 vez por CPF por usuário dentro do mesmo dia.
+ * Implementação: request_id determinístico (user_id + service_slug + YYYY-MM-DD + sha256(CPF_digits)).
+ * Segurança: NÃO armazena CPF puro no request_id (somente hash).
+ */
+
+if (!function_exists('acme_cpf_digits')) {
+  function acme_cpf_digits(string $cpf): string
+  {
+    return preg_replace('/\D+/', '', (string) $cpf);
+  }
+}
+
+if (!function_exists('acme_cpf_hash')) {
+  function acme_cpf_hash(string $cpf): string
+  {
+    $digits = acme_cpf_digits($cpf);
+    return hash('sha256', $digits);
+  }
+}
+
+if (!function_exists('acme_daily_debit_request_id')) {
+  /**
+   * Gera request_id determinístico para deduplicar débito por CPF/dia/usuário.
+   *
+   * @param int $user_id
+   * @param string $service_slug Ex: 'clt'
+   * @param string $cpf CPF (qualquer formato). Usamos apenas dígitos e aplicamos sha256.
+   * @param string|null $ymd Dia no formato 'YYYY-MM-DD'. Se null, usa wp_date('Y-m-d') (timezone do site).
+   */
+  function acme_daily_debit_request_id(int $user_id, string $service_slug, string $cpf, ?string $ymd = null): string
+  {
+    $user_id = (int) $user_id;
+    $service_slug = (string) $service_slug;
+    $ymd = $ymd ? (string) $ymd : wp_date('Y-m-d'); // timezone do WP
+    $cpf_h = acme_cpf_hash($cpf);
+
+    // base determinística -> hash final (64 hex)
+    $base = $user_id . '|' . $service_slug . '|' . $ymd . '|' . $cpf_h;
+    return hash('sha256', $base);
+  }
+}
+
+/* ============================================================
  * 2) HELPERS DE TABELAS
  * ============================================================
  */
@@ -899,6 +945,24 @@ if (!function_exists('acme_consume_credit')) {
     $txT   = $wpdb->prefix . 'credit_transactions';
     $ctT   = $wpdb->prefix . 'credit_contracts';
     $now   = current_time('mysql');
+
+    // Idempotência de débito:
+    // Se o request_id já foi debitado com sucesso, não debita novamente.
+    // (Usado para regra: 1 débito por CPF por usuário por dia.)
+    if (!empty($request_id)) {
+      $already = $wpdb->get_var($wpdb->prepare(
+        "SELECT id FROM {$txT} WHERE request_id=%s AND type='debit' AND status='success' LIMIT 1",
+        (string) $request_id
+      ));
+      if ($already) {
+        return [
+          'ok' => true,
+          'skipped' => true,
+          'reason' => 'already_debited',
+          'request_id' => (string) $request_id
+        ];
+      }
+    }
 
     $wpdb->query('START TRANSACTION');
 

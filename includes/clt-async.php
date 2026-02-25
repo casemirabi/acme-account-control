@@ -724,7 +724,30 @@ function acme_api_clt_webhook(WP_REST_Request $req)
   if ($final_status === 'completed') {
     $uid = (int) ($row['user_id'] ?? 0);
     if ($uid && function_exists('acme_consume_credit')) {
-      acme_consume_credit($uid, 'clt', 1, $rid);
+      //acme_consume_credit($uid, 'clt', 1, $rid);
+      // Importante: NÃO altera o request_id da consulta (fornecedores externos continuam usando $rid).
+      $cpfHashParaDebito = (string) ($row['cpf_hash'] ?? '');
+      $created_ymd = '';
+
+      if (!empty($row['created_at'])) {
+        $created_ymd = date('Y-m-d', strtotime((string) $row['created_at']));
+      }
+
+      // fallback: comportamento antigo (não quebra nada)
+      $debit_rid = (string) $rid;
+
+      // regra CPF+dia (idempotência) só se tiver os insumos
+      if ($cpfHashParaDebito !== '' && $created_ymd !== '') {
+        // Se você quiser usar sua função existente, passe o HASH (não o CPF)
+        if (function_exists('acme_daily_debit_request_id')) {
+          $debit_rid = acme_daily_debit_request_id($uid, 'clt', $cpfHashParaDebito, $created_ymd);
+        } else {
+          $base = $uid . '|clt|' . $created_ymd . '|' . $cpfHashParaDebito;
+          $debit_rid = hash('sha256', $base);
+        }
+      }
+
+      acme_consume_credit($uid, 'clt', 1, $debit_rid);
     }
 
     /**
