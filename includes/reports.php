@@ -52,7 +52,7 @@ add_filter('acme_export_registry', function ($r) {
       $sql = $wpdb->prepare("
         SELECT
           t.service_id AS service_id,
-          COALESCE(NULLIF(t.service_name,''), s.name, t.service_slug) AS service_name,
+          COALESCE(NULLIF(t.service_name,''), s.name, t.service_slug) AS service_name
           COALESCE(SUM(
             CASE
               WHEN t.type = 'credit' THEN t.credits

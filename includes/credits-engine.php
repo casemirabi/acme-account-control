@@ -58,6 +58,28 @@ if (!function_exists('acme_credits_tx_log')) {
 
     $now = current_time('mysql');
 
+    // >>>>> AUTO-PREENCHER service_slug/service_name pelo service_id <<<<<
+    if (
+      (empty($data['service_slug']) || empty($data['service_name'])) &&
+      !empty($data['service_id'])
+    ) {
+      $serviceId = (int) $data['service_id'];
+
+      if ($serviceId > 0) {
+        $servicesTable = acme_table_services(); // vem do helpers.php (carregado antes)
+
+        $serviceRow = $wpdb->get_row(
+          $wpdb->prepare("SELECT slug, name FROM {$servicesTable} WHERE id = %d LIMIT 1", $serviceId)
+        );
+
+        if ($serviceRow) {
+          if (empty($data['service_slug'])) $data['service_slug'] = (string) $serviceRow->slug;
+          if (empty($data['service_name'])) $data['service_name'] = (string) $serviceRow->name;
+        }
+      }
+    }
+    // >>>>> FIM <<<<<
+
     // defaults alinhados com sua tabela
     $row = array_merge([
       'user_id' => 0,              // alvo (quem recebeu ou quem foi debitado)
@@ -72,6 +94,9 @@ if (!function_exists('acme_credits_tx_log')) {
       'actor_user_id' => get_current_user_id(),
       'notes' => null,
       'meta' => null,           // json string
+
+      // NOVO:
+      'origin' => 'concession',
       'created_at' => $now,
 
       // wallet_* pode ficar NULL quando não usamos wallet
@@ -190,7 +215,6 @@ if (!function_exists('acme_credits_grant')) {
         $wpdb->query('ROLLBACK');
         return ['success' => false, 'message' => acme_debug_db_error('Erro ao inserir wallet'), 'tx_id' => null];
       }
-
     } else {
       $new_total = $before_total + $credits_amount;
 
@@ -240,6 +264,10 @@ if (!function_exists('acme_credits_grant')) {
       'status' => 'success',
       'notes' => $notes,
       'meta' => $meta_json,
+
+      // NOVO:
+      'origin' => 'concession',
+
       'created_at' => $now,
     ]);
 
