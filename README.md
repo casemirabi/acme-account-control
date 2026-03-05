@@ -29,14 +29,18 @@ WordPress que necessitam de:
 
 ## Estrutura principal
 
-acme-account-control/ │ ├── acme-account-control.php ├── includes/ │ ├──
-helpers.php │ ├── users-module.php │ ├── services-module.php │ ├──
-credits-engine.php │ ├── credits-module.php │ ├── credits-admin.php │
-├── credits-frontend.php │ ├── credits-transactions.php │ ├──
-credits-distribution.php │ ├── credits-transfer.php │ ├──
-credits-contracts.php │ ├── credits-lots.php │ ├── clt-async.php │ ├──
-role-labels.php │ ├── services/ │ ├── clt-provider.php │ ├── lib/ │ ├──
-dompdf/ │ └── vendor/
+acme-account-control/
+├── app/
+│   ├── controllers/
+│   ├── services/
+│   ├── models/
+│   ├── support/
+│   └── integrations/
+├── includes/ (wrappers de compatibilidade)
+├── services/ (wrapper de compatibilidade)
+├── lib/
+│   └── dompdf/
+└── vendor/
 
 ------------------------------------------------------------------------
 
