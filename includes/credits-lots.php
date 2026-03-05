@@ -71,8 +71,8 @@ function acme_lot_create(int $owner_user_id, int $service_id, string $source, in
   $ok = $wpdb->insert($t, [
     'owner_user_id' => $owner_user_id,
     'service_id'    => $service_id,
-    
-    
+
+
     'source'        => $source,
     'contract_id'   => $contract_id ?: null,
     'credits_total' => $credits_total,
@@ -170,12 +170,17 @@ function acme_lots_transfer_child_to_grandchild(int $child_id, int $grandchild_i
 
     // Log opcional em wp_credit_transactions, se existir logger
     if (function_exists('acme_credits_tx_log')) {
-      $notes_out = $notes ? ("Distribuição para Sub-Login #{$grandchild_id} - {$notes}") : "Distribuição para Sub-Login #{$grandchild_id}";
+      //$notes_out = $notes ? ("Distribuição para Sub-Login #{$grandchild_id} - {$notes}") : "Distribuição para Sub-Login #{$grandchild_id}";
+      $grandchild_user = get_userdata((int) $grandchild_id);
+      $grandchild_name = $grandchild_user ? $grandchild_user->display_name : ("#{$grandchild_id}");
+
+      $notes_suffix = $notes ? ' - ' . $notes : '';
+      $notes_out = "Distribuição para {$grandchild_name}{$notes_suffix}";
+
       acme_credits_tx_log([
         'user_id'       => $child_id,
         'actor_user_id' => $child_id,
         'service_id'    => $service_id,
-        
         'type'          => 'debit',
         'credits'       => $credits,
         'origin'       => 'concession',
@@ -186,7 +191,19 @@ function acme_lots_transfer_child_to_grandchild(int $child_id, int $grandchild_i
         'created_at'    => $now,
       ]);
 
-      $notes_in = $notes ? ("Recebido do Master #{$child_id} - {$notes}") : "Recebido do Master #{$child_id}";
+      //$notes_in = $notes ? ("Recebido do Master #{$child_id} - {$notes}") : "Recebido do Master #{$child_id}";
+      $child_user = get_userdata((int) $child_id);
+
+      if ($child_user) {
+        //$child_label = "{$child_user->display_name} (#{$child_id})";
+        $child_label = "{$child_user->display_name}";
+      } else {
+        $child_label = "#{$child_id}";
+      }
+
+      $notes_suffix = $notes ? ' - ' . $notes : '';
+      $notes_in = "Recebido de {$child_label}{$notes_suffix}";
+
       acme_credits_tx_log([
         'user_id'       => $grandchild_id,
         'actor_user_id' => $child_id,
@@ -333,7 +350,13 @@ function acme_lots_recover_grandchild_to_child(int $child_id, int $grandchild_id
 
     // Log opcional
     if (function_exists('acme_credits_tx_log')) {
-      $notes_out = $notes ? ("Recuperação para Master #{$child_id} - {$notes}") : "Recuperação para Master #{$child_id}";
+      //$notes_out = $notes ? ("Recuperação para Master #{$child_id} - {$notes}") : "Recuperação para Master #{$child_id}";
+      $usuario_master = get_userdata((int) $child_id);
+      $nome_master = $usuario_master ? $usuario_master->display_name : 'Usuário removido';
+
+      $notes_suffix = $notes ? ' - ' . $notes : '';
+      $notes_out = "Recuperação para {$nome_master}{$notes_suffix}";
+
       acme_credits_tx_log([
         'user_id'       => $grandchild_id,
         'actor_user_id' => $child_id,
@@ -348,7 +371,14 @@ function acme_lots_recover_grandchild_to_child(int $child_id, int $grandchild_id
         'created_at'    => $now,
       ]);
 
-      $notes_in = $notes ? ("Recuperado do Sub-Login #{$grandchild_id} - {$notes}") : "Recuperado do Sub-Login #{$grandchild_id}";
+      //$notes_in = $notes ? ("Recuperado do Sub-Login #{$grandchild_id} - {$notes}") : "Recuperado do Sub-Login #{$grandchild_id}";
+      $grandchild_user = get_userdata((int) $grandchild_id);
+      $grandchild_name = $grandchild_user ? $grandchild_user->display_name : ("#{$grandchild_id}");
+
+      $notes_suffix = $notes ? ' - ' . $notes : '';
+      $notes_in = "Recuperado de {$grandchild_name}{$notes_suffix}";
+
+
       acme_credits_tx_log([
         'user_id'       => $child_id,
         'actor_user_id' => $child_id,

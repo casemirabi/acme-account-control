@@ -2317,6 +2317,7 @@ add_shortcode('acme_add_user', function () {
     $allowed_roles = $is_admin ? ['grandchild', 'child'] : ['grandchild'];
     $children      = $is_admin ? get_users(['role' => 'child']) : [];
     $back_url      = wp_get_referer() ?: site_url('/');
+    $home_url = home_url('/');
 
     ob_start();
 
@@ -2334,7 +2335,7 @@ add_shortcode('acme_add_user', function () {
 
             <div class="acme-form-actions">
                 <a class="acme-btn" style="background:#fff;color:#0f172a;border:1px solid #e2e8f0;"
-                    href="<?php echo esc_url($back_url); ?>">← Voltar</a>
+                    href="<?php echo esc_url($home_url); ?>">← Voltar</a>
             </div>
         </div>
 

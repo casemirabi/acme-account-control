@@ -84,6 +84,7 @@ CREATE TABLE IF NOT EXISTS `wp_credit_transactions` (
   `service_slug` VARCHAR(100) NULL,
   `service_name` VARCHAR(120) NULL,
   `type` VARCHAR(20) NOT NULL,                     -- ex: grant | debit | refund | transfer | ...
+  `origin` VARCHAR(20) NOT NULL,
   `credits` INT NOT NULL DEFAULT 0,
   `status` VARCHAR(20) NOT NULL DEFAULT 'success',
   `attempts` INT NOT NULL DEFAULT 1,

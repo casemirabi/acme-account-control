@@ -1,0 +1,213 @@
+/* ACME Account Control — Layout base (migrado de <style> inline) */
+
+/* Painel / componentes base (antes em acme_ui_panel_css) */
+.acme-panel{
+  max-width:auto;
+  margin:18px auto;
+  background:#fff;
+  border:1px solid #e5e7eb;
+  border-radius:14px;
+  box-shadow:0 8px 22px rgba(0,0,0,.06);
+  overflow:hidden;
+  /*font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;*/
+}
+.acme-panel-h{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  padding:14px 16px;
+  border-bottom:1px solid #f1f5f9;
+}
+.acme-panel-title{font-weight:900;font-size:16px;color:#0f172a;}
+.acme-panel-sub{font-size:13px;color:#64748b;}
+
+.acme-btn{
+  display:inline-block;
+  padding:8px 12px;
+  border-radius:10px;
+  border:1px solid #e2e8f0;
+  background:#f8fafc;
+  text-decoration:none;
+  font-weight:800;
+  color:#0f172a;
+  cursor:pointer;
+}
+.acme-btn:hover{background:#eef2ff;}
+
+.acme-table{width:100%;border-collapse:collapse;font-size:13px;}
+.acme-table th,.acme-table td{
+  border-top:1px solid #f1f5f9;
+  padding:10px 12px;
+  text-align:left;
+  vertical-align:top;
+}
+.acme-table th{background:#f8fafc;color:#334155;font-weight:900;}
+
+.acme-badge{
+  display:inline-block;
+  padding:4px 10px;
+  border-radius:999px;
+  font-weight:900;
+  font-size:12px;
+  border:1px solid transparent;
+}
+.acme-badge-pending{background:#fff7ed;color:#9a3412;border-color:#fed7aa;}
+.acme-badge-completed{background:#ecfdf5;color:#047857;border-color:#a7f3d0;}
+.acme-badge-failed{background:#fef2f2;color:#b91c1c;border-color:#fecaca;}
+
+.acme-mono{
+  font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;
+  font-size:12px;
+  color:#334155;
+}
+.acme-muted{color:#64748b;}
+
+/* Inputs (acme-input e acme-inp) */
+.acme-input,
+.acme-inp{
+  width:100%;
+  padding:10px 12px;
+  border:1px solid #e2e8f0;
+  border-radius:10px;
+  background:#fff;
+  outline:none;
+  box-sizing:border-box;
+}
+.acme-input:focus,
+.acme-inp:focus{
+  border-color:#c7d2fe;
+  box-shadow:0 0 0 3px rgba(99,102,241,.12);
+}
+
+/* Shortcode: [acme_my_grandchildren_manage] */
+.acme-actions{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  align-items:center;
+  justify-content:flex-end;
+}
+.acme-filter-grid{display:grid;gap:12px;}
+.acme-filter-row-4{
+  display:grid;
+  grid-template-columns: 1fr 1fr ;
+  gap:12px;
+}
+.acme-filter-row-3{
+  display:grid;
+  grid-template-columns: 1fr 1fr 180px;
+  gap:12px;
+  align-items:end;
+}
+@media (max-width: 720px){
+  .acme-filter-row-4,
+  .acme-filter-row-3{
+    grid-template-columns: 1fr;
+  }
+}
+
+
+.acme-field label{display:block;margin-bottom:6px;}
+.acme-btn-block{width:100%;}
+
+/* Shortcode: [acme_add_user] */
+.acme-form-col{
+  display:grid;
+  grid-template-columns: 1fr;
+  gap:12px;
+}
+.acme-form-actions{
+  display:flex;
+  justify-content:flex-end;
+  gap:8px;
+  flex-wrap:wrap;
+  align-items:center;
+}
+
+/* Shortcode: [acme_grant_credits] */
+.acme-fields-4{
+  display:grid;
+  grid-template-columns: 1.6fr 1fr 1fr 1fr;
+  gap:12px;
+  align-items:end;
+}
+@media (max-width: 980px){
+  .acme-fields-4{grid-template-columns: 1fr 1fr;}
+}
+@media (max-width: 560px){
+  .acme-fields-4{grid-template-columns: 1fr;}
+}
+
+/* Botão ícone - versão clean */
+.acme-btn-icon{
+  width:42px;
+  height:42px;
+  border-radius:12px;
+  border:1px solid #e2e8f0;
+  background:#fff;            /* 🔁 fundo branco */
+  color:#64748b;              /* cor do ícone */
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  cursor:pointer;
+  transition:all .15s ease;
+}
+
+.acme-btn-icon:hover{
+  background:#f8fafc;         /* leve hover */
+  border-color:#cbd5e1;
+  color:#0f172a;
+}
+
+.acme-btn-icon svg{
+  width:18px;
+  height:18px;
+}
+
+/* Campo do ícone: sem fundo/padding e alinhado ao fim */
+.acme-field-icon{
+  display:flex;
+  align-items:flex-end;
+  justify-content:flex-end;
+  padding:0 !important;
+  margin:0 !important;
+  background:transparent !important;
+  box-shadow:none !important;
+  border:0 !important;
+}
+
+/* Botão ícone: absolutamente sem fundo */
+.acme-field-icon .acme-btn-icon{
+  width:42px;
+  height:42px;
+  border-radius:999px;
+
+  background:transparent !important;
+  box-shadow:none !important;
+  border:1px solid transparent !important; /* se quiser SEM borda, mantém */
+  outline:none !important;
+
+  display:inline-flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+
+  padding:0 !important;
+  margin:0 !important;
+
+  color:#0f172a !important; /* cor do ícone */
+  cursor:pointer;
+
+  appearance:none;
+  -webkit-appearance:none;
+}
+
+.acme-field-icon .acme-btn-icon:hover{
+  background:transparent !important;
+  color:#0f172a !important;
+}
+
+.acme-field-icon .acme-btn-icon svg{
+  width:18px;
+  height:18px;
+  display:block;
+}

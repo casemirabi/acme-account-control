@@ -808,25 +808,11 @@ if (!function_exists('acme_credit_balance_user')) {
 if (!function_exists('acme_user_has_credit')) {
   function acme_user_has_credit($user_id, $service_slug): bool
   {
-    /*$service_id = acme_get_service_id_by_slug((string) $service_slug);
-    if (!$service_id) return false;
-    return acme_credit_balance_user((int) $user_id, (int) $service_id) > 0;
-  }*/
-    $user_id = (int) $user_id;
-
-    // ✅ Admin não precisa de créditos (capability é mais seguro que role)
-    if ($user_id > 0 && user_can($user_id, 'manage_options')) {
-      return true;
-    }
-
     $service_id = acme_get_service_id_by_slug((string) $service_slug);
     if (!$service_id) return false;
-
-    return acme_credit_balance_user($user_id, (int) $service_id) > 0;
+    return acme_credit_balance_user((int) $user_id, (int) $service_id) > 0;
   }
 }
-
-
 
 if (!function_exists('acme_credit_check_debug')) {
   function acme_credit_check_debug(int $user_id, string $service_slug): array
@@ -952,15 +938,6 @@ if (!function_exists('acme_consume_credit')) {
     $user_id = (int) $user_id;
     $amount = max(1, (int) $amount);
 
-    // ✅ Admin não consome créditos
-    if ($user_id > 0 && user_can($user_id, 'manage_options')) {
-      return [
-        'ok' => true,
-        'skipped' => true,
-        'reason' => 'admin_exempt',
-      ];
-    }
-
     $service_id = acme_get_service_id_by_slug((string) $service_slug);
     if (!$service_id) return ['ok' => false, 'error' => 'Serviço inválido (slug não existe em wp_services)'];
 
@@ -1081,9 +1058,6 @@ if (!function_exists('acme_consume_credit')) {
         'credits' => (int) $amount,
         'status' => 'success',
         'attempts' => 1,
-
-        'origin' => 'consumption',
-
 
         'request_id' => $request_id ?? null,
         'actor_user_id' => (int) $user_id,

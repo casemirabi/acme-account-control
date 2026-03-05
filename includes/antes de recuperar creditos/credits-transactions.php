@@ -365,18 +365,13 @@ add_action('admin_post_acme_export_credit_transactions', function () {
     echo "<html><head><meta charset=\"UTF-8\"></head><body>";
     echo "<table border=\"1\" cellpadding=\"5\" cellspacing=\"0\">";
     echo "<thead><tr>";
-    echo "<th>ID</th><th>Data</th><th>Usuário</th><th>Email</th><th>Serviço</th><th>Tipo</th><th>Origem</th><th>Status</th><th>Créditos</th>";
+    echo "<th>ID</th><th>Data</th><th>Usuário</th><th>Email</th><th>Serviço</th><th>Tipo</th><th>Status</th><th>Créditos</th>";
     echo "</tr></thead><tbody>";
 
     foreach ($rows as $r) {
       $status_valor = ($r->status == 'success') ? 'Sucesso' : 'Falha';
       $status_tipo = ($r->type == 'debit') ? 'Debito' : 'Crédito';
-      $origin = match ($r->origin) {
-        'concession' => 'Concedido',
-        'reserved'   => 'Estornado',
-        'consumption'   => 'Consumido',
-        default      => '',
-      };
+
       echo "<tr>";
       echo "<td>" . (int) $r->id . "</td>";
       echo "<td>" . esc_html($r->created_at) . "</td>";
@@ -384,7 +379,6 @@ add_action('admin_post_acme_export_credit_transactions', function () {
       echo "<td>" . esc_html($r->user_email) . "</td>";
       echo "<td>" . esc_html($r->service_name ?: '—') . "</td>";
       echo "<td>" . $status_tipo . "</td>";
-      echo "<td>" . $origin . "</td>";
       echo "<td>" . $status_valor . "</td>";
       echo "<td>" . (int) $r->credits . "</td>";
       echo "</tr>";
@@ -646,7 +640,7 @@ if (!function_exists('acme_render_transactions_table')) {
       </div>
 
       <div class="acme-panel-body">
-        <form id="acme-tx-filter-form" method="get" class="acme-filter-grid"> <!--</form> <form method="get" class="acme-filter-grid">-->
+       <form id="acme-tx-filter-form" method="get" class="acme-filter-grid"> <!--</form> <form method="get" class="acme-filter-grid">-->
           <?php if ($context === 'admin'): ?>
             <input type="hidden" name="page" value="acme_credit_transactions">
           <?php endif; ?>
@@ -735,7 +729,6 @@ if (!function_exists('acme_render_transactions_table')) {
           <th>Usuário</th>
           <th>Serviço</th>
           <th>Tipo</th>
-          <th>Origem</th>
           <th>Status</th>
           <th style="text-align:center;">Créditos</th>
         </tr>
@@ -753,33 +746,7 @@ if (!function_exists('acme_render_transactions_table')) {
             <td><?php echo $r->service_name ? esc_html($r->service_name) : '—'; ?></td>
 
             <td class="acme-mono">
-              <?php
-              echo esc_html(
-                $r->type === 'credit' ? 'Creditado'
-                  : ($r->type === 'debit' ? 'Debitado'
-                    : ($r->type === 'reversed' ? 'Estornado'
-                      : $r->type
-                    )
-                  )
-              );
-              ?>
-            </td>
-
-            <td class="acme-mono">
-              <?php
-              echo esc_html(
-                match ($r->origin) {
-                  'concession'  => 'Concedido',
-                  'reserved'    => 'Estornado',
-                  'consumption' => 'Consumido',
-                  ''            => '',
-                  default       => $r->origin,
-                }
-              );
-              ?>
-
-              <?php #echo esc_html($r->origin); 
-              ?>
+              <?php echo esc_html($r->type === 'credit' ? 'Creditado' : ($r->type === 'debit' ? 'Debitado' : $r->type)); ?>
             </td>
 
             <td class="acme-mono">
