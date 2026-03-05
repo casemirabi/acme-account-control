@@ -1810,7 +1810,7 @@ function acme_enqueue_edit_user_shortcode_assets()
     // Registra, mas NÃO carrega ainda
     wp_register_style(
         'acme-shortcode-edit-user',
-        plugin_dir_url(dirname(dirname(dirname(__FILE__)))) . 'assets/css/shortcode-acme-edit-user.css',
+        plugins_url('assets/css/shortcode-acme-edit-user.css', dirname(__DIR__, 2)),
         [],
         '1.0.0'
     );
