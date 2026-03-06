@@ -37,7 +37,7 @@ if (!$user_id) {
     exit;
 }
 
-require_once WP_PLUGIN_DIR.'/acme-account-control/includes/services/clt-provider.php';
+require_once WP_PLUGIN_DIR.'/acme-account-control/services/clt-provider.php';
 
 $result = acme_service_clt($user_id, $cpf);
 
