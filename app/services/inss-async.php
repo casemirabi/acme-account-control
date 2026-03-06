@@ -18,7 +18,6 @@ if (!defined('ABSPATH')) exit;
  */
 
 if (!defined('ACME_INSS_API_BASE')) define('ACME_INSS_API_BASE', 'https://teioemxjgepzvpcpevyi.supabase.co/functions/v1');
-if (!defined('ACME_INSS_API_KEY'))  define('ACME_INSS_API_KEY',  ACME_CLT_API_KEY); // reaproveita, se for a mesma
 
 add_action('rest_api_init', function () {
 
