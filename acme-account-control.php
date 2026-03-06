@@ -21,6 +21,24 @@ if (!defined('ACME_ACC_URL')) {
     define('ACME_ACC_URL', plugin_dir_url(__FILE__));
 }
 
+
+// ------------------------------------------------------------
+// Configuração (chaves e endpoints)
+// Dica: em produção, prefira definir no wp-config.php.
+// Estas definições servem como fallback seguro no bootstrap.
+// ------------------------------------------------------------
+if (!defined('ACME_DEBUG')) define('ACME_DEBUG', false);
+if (!defined('ACME_CLT_MOCK')) define('ACME_CLT_MOCK', true);
+if (!defined('ACME_CLT_API_BASE')) define('ACME_CLT_API_BASE', '');
+if (!defined('ACME_CLT_API_KEY')) define('ACME_CLT_API_KEY', '');
+if (!defined('ACME_CLT_BRIDGE_URL')) define('ACME_CLT_BRIDGE_URL', '');
+if (!defined('ACME_CLT_BRIDGE_KEY')) define('ACME_CLT_BRIDGE_KEY', '');
+if (!defined('ACME_PB_INTERNAL_KEY')) define('ACME_PB_INTERNAL_KEY', '');
+if (!defined('ACME_PB_BRIDGE_URL')) define('ACME_PB_BRIDGE_URL', '');
+if (!defined('ACME_LOCAL_TEST_KEY')) define('ACME_LOCAL_TEST_KEY', '');
+if (!defined('ACME_INSS_API_BASE')) define('ACME_INSS_API_BASE', 'https://teioemxjgepzvpcpevyi.supabase.co/functions/v1');
+if (!defined('ACME_INSS_API_KEY')) define('ACME_INSS_API_KEY', defined('ACME_CLT_API_KEY') ? (string) ACME_CLT_API_KEY : '');
+
 $acme_modules = [
     'includes/helpers.php',
     'includes/role-labels.php',

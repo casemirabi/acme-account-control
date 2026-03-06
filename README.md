@@ -141,6 +141,47 @@ Efeitos:
 
 ------------------------------------------------------------------------
 
+
+
+## ✅ Como usar agora no WordPress (pós-refatoração)
+
+Mesmo com a nova estrutura em `app/`, o WordPress continua usando o arquivo raiz:
+
+- `acme-account-control.php` (entrada oficial do plugin)
+
+### Passo a passo
+
+1. Copie a pasta do plugin para `wp-content/plugins/acme-account-control/`.
+2. Confirme que existe o arquivo `acme-account-control.php` na raiz da pasta.
+3. Ative no painel do WordPress.
+4. Configure as chaves:
+   - Recomendado: no `wp-config.php`.
+   - Alternativa: usar os fallbacks já definidos no próprio `acme-account-control.php`.
+
+### Constantes principais
+
+- `ACME_CLT_API_BASE`
+- `ACME_CLT_API_KEY`
+- `ACME_CLT_BRIDGE_URL`
+- `ACME_CLT_BRIDGE_KEY`
+- `ACME_PB_INTERNAL_KEY`
+- `ACME_PB_BRIDGE_URL`
+- `ACME_INSS_API_BASE`
+- `ACME_INSS_API_KEY`
+- `ACME_CLT_MOCK` (true/false)
+- `ACME_DEBUG` (true/false)
+
+### Exemplo no `wp-config.php`
+
+```php
+define('ACME_DEBUG', false);
+define('ACME_CLT_MOCK', true);
+define('ACME_CLT_API_BASE', 'https://seu-endpoint-clt');
+define('ACME_CLT_API_KEY', 'sua-chave');
+define('ACME_INSS_API_BASE', 'https://seu-endpoint-inss');
+define('ACME_INSS_API_KEY', 'sua-chave-inss');
+```
+
 # 🛠 Requisitos Técnicos
 
 -   WordPress 6.x+
