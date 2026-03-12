@@ -1,5 +1,5 @@
 acme-account-control.zip
-versões anteriores/
-node_modules/
+/versões anteriores
+/node_modules
 Endpont publico.txt
-lib/
+/lib
