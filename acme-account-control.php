@@ -100,9 +100,6 @@ acme_safe_require(ACME_ACC_PATH . 'includes/support/helpers.php', true);
 acme_safe_require(ACME_ACC_PATH . 'includes/support/api-consumers.php', false);
 acme_safe_require(ACME_ACC_PATH . 'includes/models/users-module.php', true);
 acme_safe_require(ACME_ACC_PATH . 'includes/services/services-module.php', true);
-//acme_safe_require(ACME_ACC_PATH . 'services/clt-provider.php', true);
-
-
 
 acme_safe_require(__DIR__ . '/includes/services/credits-engine.php', true);
 acme_safe_require(__DIR__ . '/includes/services/credits-module.php', true);
@@ -147,7 +144,6 @@ register_activation_hook(__FILE__, function () {
   if (function_exists('acme_credit_lots_activate')) acme_credit_lots_activate();
 
   if (function_exists('acme_users_activate')) acme_users_activate();
-  //if (function_exists('acme_api_logs_activate')) acme_api_logs_activate();
   if (function_exists('acme_api_consumers_activate')) acme_api_consumers_activate();
   if (function_exists('acme_clt_activate')) acme_clt_activate();
   if (function_exists('acme_inss_activate')) acme_inss_activate();
