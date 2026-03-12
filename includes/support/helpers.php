@@ -1207,3 +1207,24 @@ if (!function_exists('acme_ui_panel_css')) {
 </style>';
   }
 }
+
+if (!function_exists('acme_get_grandchildren_of_child')) {
+  function acme_get_grandchildren_of_child(int $child_id): array
+  {
+    global $wpdb;
+
+    $linksTable = function_exists('acme_table_links')
+      ? acme_table_links()
+      : ($wpdb->prefix . 'account_links');
+
+    $grandchildrenIds = $wpdb->get_col($wpdb->prepare(
+      "SELECT child_user_id
+       FROM {$linksTable}
+       WHERE parent_user_id = %d
+         AND depth = 2",
+      $child_id
+    ));
+
+    return array_values(array_unique(array_map('intval', (array) $grandchildrenIds)));
+  }
+}

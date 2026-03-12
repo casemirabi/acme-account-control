@@ -49,15 +49,6 @@ function acme_get_parent_child_of_grandchild(int $grandchild_id): int {
   return $parent;
 }
 
-/** Lista os Netos de um Filho */
-function acme_get_grandchildren_of_child(int $child_id): array {
-  global $wpdb;
-  $linksT = acme_table_links();
-  return array_map('intval', (array) $wpdb->get_col($wpdb->prepare(
-    "SELECT child_user_id FROM {$linksT} WHERE parent_user_id=%d AND depth=2",
-    $child_id
-  )));
-}
 
 /** Saldo disponível do Filho (wallet) para um service_id */
 function acme_child_wallet_available(int $child_id, int $service_id): int {
