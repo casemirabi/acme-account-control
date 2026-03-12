@@ -1,0 +1,123 @@
+/* Escopo só do card */
+#acme-clt-card {
+  max-width: 100%;
+  margin: 0 auto;
+  border: 2px solid rgba(20, 55, 120, .25);
+  border-radius: 14px;
+  background: #fff;
+  padding: 22px;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, .06);
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;
+}
+
+#acme-clt-head {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+#acme-clt-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 12px;
+  background: rgba(22, 74, 160, .08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 52px;
+}
+
+#acme-clt-title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 800;
+  color: #1e3a8a;
+  line-height: 1.2;
+}
+
+#acme-clt-sub {
+  margin: 6px 0 0;
+  color: #6b7280;
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+#acme-clt-form {
+  margin-top: 14px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+#acme-cpf {
+  flex: 1 1 260px;
+  min-width: 220px;
+  padding: 12px 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  font-size: 14px;
+  outline: none;
+}
+
+#acme-cpf:focus {
+  border-color: rgba(30, 58, 138, .55);
+  box-shadow: 0 0 0 4px rgba(30, 58, 138, .12);
+}
+
+#acme-btn {
+  flex: 0 0 auto;
+  padding: 12px 18px;
+  border: 0;
+  border-radius: 12px;
+  cursor: pointer;
+  font-weight: 800;
+  font-size: 14px;
+  color: #fff;
+  background: #1e3a8a;
+  box-shadow: 0 10px 18px rgba(30, 58, 138, .18);
+  transition: transform .05s ease, opacity .15s ease;
+}
+
+#acme-btn:active {
+  transform: translateY(1px);
+}
+
+#acme-btn:disabled {
+  opacity: .6;
+  cursor: not-allowed;
+}
+
+#acme-clt-result {
+  margin-top: 14px;
+}
+
+.acme-msg {
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  background: #f9fafb;
+  font-size: 13px;
+  color: #111827;
+}
+
+.acme-msg-err {
+  border-color: rgba(220, 38, 38, .35);
+  background: rgba(220, 38, 38, .06);
+}
+
+.acme-msg-ok {
+  border-color: rgba(22, 163, 74, .35);
+  background: rgba(22, 163, 74, .06);
+}
+
+@media (max-width: 520px) {
+  #acme-btn {
+    width: 100%;
+  }
+
+  #acme-cpf {
+    width: 100%;
+  }
+}

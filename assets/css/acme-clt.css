@@ -1,0 +1,236 @@
+.acme-card {
+    border: 1px solid #e5e7eb;
+    border-radius: 14px;
+    background: #fff;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, .06)
+}
+
+.acme-card-h {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 14px;
+    border-bottom: 1px solid #f1f5f9
+}
+
+.acme-title {
+    font-weight: 800;
+    font-size: 16px;
+    color: #0f172a
+}
+
+.acme-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center
+}
+
+.acme-card-b {
+    padding: 14px
+}
+
+.acme-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px
+}
+
+@media (max-width: 640px) {
+    .acme-grid {
+        grid-template-columns: 1fr
+    }
+}
+
+.acme-field {
+    border: 1px solid #f1f5f9;
+    border-radius: 12px;
+    padding: 10px;
+    background: #fbfdff
+}
+
+.acme-label {
+    font-size: 12px;
+    color: #475569;
+    margin-bottom: 4px
+}
+
+.acme-value {
+    font-size: 14px;
+    font-weight: 800;
+    color: #0f172a
+}
+
+.acme-muted {
+    color: #475569;
+    font-size: 13px
+}
+
+.acme-badge {
+    font-size: 12px;
+    font-weight: 900;
+    border-radius: 999px;
+    padding: 6px 10px;
+    border: 1px solid transparent;
+    white-space: nowrap
+}
+
+.acme-badge-ok {
+    background: #ecfdf5;
+    color: #047857;
+    border-color: #a7f3d0
+}
+
+.acme-badge-bad {
+    background: #fef2f2;
+    color: #b91c1c;
+    border-color: #fecaca
+}
+
+.acme-summary {
+    cursor: pointer;
+    font-weight: 800;
+    color: #0f172a
+}
+
+.acme-tbl {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px
+}
+
+.acme-tbl th,
+.acme-tbl td {
+    border: 1px solid #e5e7eb;
+    padding: 8px;
+    vertical-align: top
+}
+
+.acme-tbl th {
+    background: #f8fafc;
+    text-align: left
+}
+
+.acme-btn {
+    display: inline-block;
+    padding: 8px 10px;
+    border-radius: 12px;
+    font-weight: 900;
+    font-size: 12px;
+    border: 1px solid #e2e8f0;
+    background: #0b4ea2;
+    color: #fff;
+    text-decoration: none
+}
+
+.acme-btn:hover {
+    opacity: .92
+}
+
+.acme-msg {
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    padding: 12px;
+    background: #fff;
+    color: #0f172a
+}
+
+.acme-msg-err {
+    border-color: #fecaca;
+    background: #fef2f2;
+    color: #991b1b
+}
+
+.acme-msg-ok {
+    border-color: #a7f3d0;
+    background: #ecfdf5;
+    color: #065f46
+}
+
+/* ===== CLT Panel: filtros no padrão (cards levemente azulados) ===== */
+
+.acme-panel-filters{
+  padding: 12px 16px;
+  border-top: 1px solid #eef2f7;
+  background: #fff;
+}
+
+.acme-filter-grid{
+  display: grid;
+  gap: 12px;
+}
+
+/* 5 campos + botão */
+.acme-filter-row-6{
+  display: grid;
+  grid-template-columns:
+    minmax(160px, 0.9fr)   /* Status */
+    minmax(170px, 0.9fr)   /* Elegibilidade */
+    minmax(220px, 1.2fr)   /* CPF */
+    minmax(180px, 1fr)     /* Data (de) */
+    minmax(180px, 1fr)     /* Data (até) */
+    auto;                  /* Botão */
+  gap: 12px;
+  align-items: end;
+}
+
+/* cards dos campos com o “azuladinho” */
+.acme-field{
+  background: #f8fafc;
+  border: 1px solid #eef2f7;
+  border-radius: 12px;
+  padding: 12px;
+  min-width: 0;
+}
+
+.acme-field label{
+  display: block;
+  margin-bottom: 6px;
+}
+
+/* botão alinhado ao fim */
+.acme-filter-actions{
+  display: flex;
+  align-items: end;
+  justify-content: flex-end;
+}
+
+/* Mobile: quebra pra 1 coluna */
+@media (max-width: 720px){
+  .acme-filter-row-6{
+    grid-template-columns: 1fr;
+  }
+  .acme-filter-actions{
+    justify-content: stretch;
+  }
+  .acme-filter-actions .acme-btn{
+    width: 100%;
+    text-align: center;
+  }
+}
+
+/* Botão circular de pesquisar (ícone) */
+.acme-btn-icon{
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  color: #0f172a;
+  cursor: pointer;
+}
+
+.acme-btn-icon:hover{
+  background: #f8fafc;
+}
+
+/* deixa o ícone com tamanho consistente */
+.acme-btn-icon svg{
+  width: 18px;
+  height: 18px;
+  display: block;
+}
+

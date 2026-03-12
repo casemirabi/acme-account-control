@@ -1,0 +1,25 @@
+===========Criar Requisição===============
+$headers = @{
+    "Content-Type" = "application/json"
+    "x-acme-key"   = "acme_live_h9F7yYgFFrtiKuk6BJp9oFmPUPOgoKUh"
+}
+
+$body = @{
+    cpf = "44631827866"
+} | ConvertTo-Json
+
+Invoke-RestMethod `
+    -Uri "https://staging.maiscorban.net/wp-json/acme/v1/api-clt" `
+    -Method Post `
+    -Headers $headers `
+    -Body $body
+
+============Consultar Status=========
+$headers = @{
+    "x-acme-key" = "acme_live_h9F7yYgFFrtiKuk6BJp9oFmPUPOgoKUh"
+}
+
+Invoke-RestMethod `
+    -Uri "https://staging.maiscorban.net/wp-json/acme/v1/api-clt-status?request_id=clt_7ea98c038743" `
+    -Method Get `
+    -Headers $headers
