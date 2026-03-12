@@ -446,9 +446,75 @@ function acme_api_clt_start(WP_REST_Request $req)
 
 /* ============================================================
  * GET /api-clt-status
+ * Normalização do Json dew saída
  * ============================================================
  */
 
+if (!function_exists('acme_clt_build_public_status_response')) {
+  function acme_clt_build_public_status_response(array $responseData): array
+  {
+    $dados = $responseData['dados'] ?? null;
+
+    if (!is_array($dados)) {
+      return ['dados' => []];
+    }
+
+    $dadosNormalizados = [];
+    foreach ($dados as $item) {
+      if (!is_array($item)) {
+        continue;
+      }
+
+      $margem = is_array($item['margem'] ?? null) ? $item['margem'] : [];
+      $vinculos = is_array($item['vinculos'] ?? null) ? $item['vinculos'] : [];
+      $propostas = is_array($item['propostas'] ?? null) ? $item['propostas'] : [];
+
+      $vinculosPublicos = [];
+      foreach ($vinculos as $vinculo) {
+        if (!is_array($vinculo)) {
+          continue;
+        }
+
+        $vinculosPublicos[] = [
+          'elegivel' => (bool) ($vinculo['elegivel'] ?? false),
+          'numeroRegistro' => $vinculo['numeroRegistro'] ?? null,
+        ];
+      }
+
+            $cpfPublico = $item['cpf_full'] ?? $item['cpf'] ?? $item['cpf_masked'] ?? null;
+
+
+      $dadosNormalizados[] = [
+        'ok' => (bool) ($item['ok'] ?? false),
+        'numeroDocumento' => $cpfPublico,//$item['cpf_masked'] ?? $item['cpf'] ?? null,
+        'nome' => $item['nome'] ?? null,
+        'status' => $item['status'] ?? [],
+        'vinculos' => $vinculosPublicos,
+        'margem' => [
+          'valorMargemDisponivel' => $margem['valorMargemDisponivel'] ?? null,
+          'valorMargemBase' => $margem['valorMargemBase'] ?? null,
+          'valorTotalDevido' => $margem['valorTotalDevido'] ?? null,
+          'registroEmpregaticio' => $margem['registroEmpregaticio'] ?? null,
+          'cnpjEmpregador' => $margem['cnpjEmpregador'] ?? null,
+          'dataAdmissao' => $margem['dataAdmissao'] ?? null,
+        ],
+        'propostas' => [
+          'source' => $propostas['source'] ?? null,
+          'error' => $propostas['error'] ?? null,
+          'message' => $propostas['message'] ?? null,
+        ],
+      ];
+    }
+
+    return ['dados' => $dadosNormalizados];
+  }
+}
+//=============================
+
+/* ============================================================
+ * GET /api-clt-status
+ * ============================================================
+ */
 function acme_api_clt_status(WP_REST_Request $req)
 {
   global $wpdb;
@@ -489,7 +555,12 @@ function acme_api_clt_status(WP_REST_Request $req)
   if ($row['status'] === 'completed') {
 
     if (!empty($row['response_json'])) {
-      $data['response_data'] = json_decode($row['response_json'], true);
+      //$data['response_data'] = json_decode($row['response_json'], true);
+      /*Nomrmalização da saída do endpoint status */
+      $decodedResponse = json_decode($row['response_json'], true);
+      $data['response_data'] = acme_clt_build_public_status_response(
+        is_array($decodedResponse) ? $decodedResponse : []
+      );
     }
     if (!empty($row['error_message'])) {
       $data['business_warning'] = [
