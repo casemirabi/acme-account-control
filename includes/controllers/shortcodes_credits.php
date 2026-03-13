@@ -2035,6 +2035,180 @@ add_shortcode('acme_recover_credits_form', function () {
       </p>
     </form>
   </div>
-<?php
+  <?php
   return ob_get_clean();
 });
+
+
+#==============================================================
+
+if (!function_exists('acme_render_credit_table_html')) {
+  if (!function_exists('acme_render_credit_table_html')) {
+    function acme_render_credit_table_html(array $detailRows, array $serviceTotals, bool $showTotals): string
+    {
+      $detailCount = count($detailRows);
+
+      ob_start();
+  ?>
+      <div class="acme-panel acme-tx-panel">
+        <div class="acme-panel-h">
+          <div>
+            <div class="acme-panel-title">Créditos Disponíveis</div>
+            <div class="acme-panel-sub">
+              Consulta de créditos por usuário, serviço e validade conforme seu escopo de acesso.
+            </div>
+          </div>
+
+          <div class="acme-actions">
+            <a class="acme-btn" href="<?php echo esc_url(add_query_arg([], get_permalink())); ?>">
+              Atualizar
+            </a>
+          </div>
+        </div>
+
+        <div class="acme-panel-body">
+          <p class="acme-muted acme-total">
+            Total encontrado: <strong><?php echo (int) $detailCount; ?></strong>
+          </p>
+        </div>
+
+        <?php if ($showTotals): ?>
+          <div class="acme-table-wrap" style="margin-bottom:18px;">
+            <table class="acme-table">
+              <thead>
+                <tr>
+                  <th>Serviço</th>
+                  <th>Slug</th>
+                  <th style="text-align:center;">Total disponível</th>
+                </tr>
+              </thead>
+              <tbody>
+                <?php if (empty($serviceTotals)): ?>
+                  <tr>
+                    <td colspan="3" class="acme-muted" style="text-align:center;">
+                      Nenhum total por serviço disponível.
+                    </td>
+                  </tr>
+                <?php else: ?>
+                  <?php foreach ($serviceTotals as $totalRow): ?>
+                    <tr>
+                      <td>
+                        <strong><?php echo esc_html($totalRow['service_name'] ?? '—'); ?></strong>
+                      </td>
+                      <td class="acme-mono">
+                        <?php echo esc_html($totalRow['service_slug'] ?? '—'); ?>
+                      </td>
+                      <td style="text-align:center;font-weight:900;">
+                        <?php echo (int) ($totalRow['total_available'] ?? 0); ?>
+                      </td>
+                    </tr>
+                  <?php endforeach; ?>
+                <?php endif; ?>
+              </tbody>
+            </table>
+          </div>
+        <?php endif; ?>
+
+        <?php if (empty($detailRows)): ?>
+          <div class="acme-empty">Nenhum crédito disponível no escopo atual.</div>
+      </div>
+    <?php
+          return ob_get_clean();
+        endif;
+    ?>
+
+    <div class="acme-table-wrap">
+      <table class="acme-table">
+        <thead>
+          <tr>
+            <th>Usuário</th>
+            <th>Serviço</th>
+            <th style="text-align:center;">Créditos</th>
+            <th>Validade</th>
+          </tr>
+        </thead>
+        <tbody>
+          <?php foreach ($detailRows as $row): ?>
+            <tr>
+              <td>
+                <strong><?php echo esc_html($row['display_name'] ?? '—'); ?></strong><br>
+                <span class="acme-muted">
+                  <?php echo esc_html($row['user_email'] ?? '—'); ?>
+                </span>
+              </td>
+
+              <td>
+                <strong><?php echo esc_html($row['service_name'] ?? '—'); ?></strong><br>
+                <span class="acme-muted">
+                  <?php echo esc_html($row['service_slug'] ?? ''); ?>
+                </span>
+              </td>
+
+              <td style="text-align:center;font-weight:900;">
+                <?php echo (int) ($row['available_credits'] ?? 0); ?>
+              </td>
+
+              <td class="acme-mono">
+                <?php
+                $expiresAt = isset($row['expires_at']) ? (string) $row['expires_at'] : '';
+
+                if (empty($expiresAt)) {
+                  echo 'Sem validade';
+                } else {
+                  echo esc_html(wp_date('d/m/Y H:i:s', strtotime($expiresAt)));
+                }
+                ?>
+              </td>
+            </tr>
+          <?php endforeach; ?>
+        </tbody>
+      </table>
+    </div>
+    </div>
+<?php
+
+      return (string) ob_get_clean();
+    }
+  }
+}
+
+if (!shortcode_exists('acme_credit_inventory_table')) {
+  add_shortcode('acme_credit_inventory_table', function ($atts) {
+    if (!is_user_logged_in()) {
+      return '<p>Você precisa estar logado.</p>';
+    }
+
+    $currentUser = wp_get_current_user();
+    $currentUserId = get_current_user_id();
+
+    $resolvedTargetUserId = function_exists('acme_credits_table_resolve_context_user_id')
+      ? acme_credits_table_resolve_context_user_id()
+      : $currentUserId;
+
+    if (!function_exists('acme_can_view_credit_table_for_user') || !acme_can_view_credit_table_for_user($resolvedTargetUserId)) {
+      return '<p>Sem permissão para visualizar os créditos.</p>';
+    }
+
+    $visibleUserIds = function_exists('acme_get_credit_table_visible_user_ids')
+      ? acme_get_credit_table_visible_user_ids($resolvedTargetUserId)
+      : [$currentUserId];
+
+    if (empty($visibleUserIds)) {
+      return '<p>Nenhum usuário visível neste contexto.</p>';
+    }
+
+    $detailRows = function_exists('acme_get_credit_table_rows')
+      ? acme_get_credit_table_rows($visibleUserIds)
+      : [];
+
+    $showTotals = current_user_can('manage_options') || acme_user_has_role($currentUser, 'child');
+
+    $serviceTotals = $showTotals && function_exists('acme_get_credit_table_service_totals')
+      ? acme_get_credit_table_service_totals($visibleUserIds)
+      : [];
+
+    return acme_render_credit_table_html($detailRows, $serviceTotals, $showTotals);
+  });
+}
+
+

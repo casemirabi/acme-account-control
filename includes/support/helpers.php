@@ -1228,3 +1228,272 @@ if (!function_exists('acme_get_grandchildren_of_child')) {
     return array_values(array_unique(array_map('intval', (array) $grandchildrenIds)));
   }
 }
+
+#========================================================
+if (!function_exists('acme_credits_table_resolve_context_user_id')) {
+  /**
+   * Resolve o usuário-alvo conforme contexto da tela.
+   *
+   * Regras:
+   * - my-profile => sempre usuário logado
+   * - view-user / edit-user => usa user_id da URL
+   * - fallback => usuário logado
+   */
+  function acme_credits_table_resolve_context_user_id(): int
+  {
+    if (!is_user_logged_in()) {
+      return 0;
+    }
+
+    $currentUserId = get_current_user_id();
+    $requestUri = isset($_SERVER['REQUEST_URI']) ? (string) wp_unslash($_SERVER['REQUEST_URI']) : '';
+
+    $isMyProfile = (strpos($requestUri, '/my-profile') !== false);
+    $isViewUser  = (strpos($requestUri, '/view-user') !== false);
+    $isEditUser  = (strpos($requestUri, '/edit-user') !== false);
+
+    if ($isMyProfile) {
+      return $currentUserId;
+    }
+
+    if ($isViewUser || $isEditUser) {
+      $targetUserId = isset($_GET['user_id']) ? (int) $_GET['user_id'] : 0;
+      return $targetUserId > 0 ? $targetUserId : $currentUserId;
+    }
+
+    return $currentUserId;
+  }
+}
+
+if (!function_exists('acme_can_view_credit_table_for_user')) {
+  /**
+   * Valida se o usuário logado pode visualizar dados do usuário-alvo.
+   *
+   * Admin => qualquer usuário
+   * Master => ele mesmo + sub-logins dele
+   * Sub-login => somente ele mesmo
+   */
+  function acme_can_view_credit_table_for_user(int $targetUserId): bool
+  {
+    if (!is_user_logged_in() || $targetUserId <= 0) {
+      return false;
+    }
+
+    $currentUserId = get_current_user_id();
+    $currentUser = wp_get_current_user();
+
+    if (current_user_can('manage_options')) {
+      return true;
+    }
+
+    if ((int) $currentUserId === (int) $targetUserId) {
+      return true;
+    }
+
+    if (acme_user_has_role($currentUser, 'child')) {
+      $grandchildrenIds = function_exists('acme_get_grandchildren_of_child')
+        ? acme_get_grandchildren_of_child($currentUserId)
+        : [];
+
+      return in_array($targetUserId, array_map('intval', $grandchildrenIds), true);
+    }
+
+    return false;
+  }
+}
+
+if (!function_exists('acme_get_credit_table_visible_user_ids')) {
+  /**
+   * Retorna os usuários que entram no escopo da tabela.
+   *
+   * Admin:
+   * - se estiver em view-user/edit-user => só o target da URL
+   * - se estiver em my-profile => só ele mesmo
+   * - demais contextos => todos os child + grandchild + próprio alvo quando aplicável
+   *
+   * Master:
+   * - my-profile => só ele mesmo
+   * - view-user/edit-user => target permitido
+   * - demais => ele mesmo + sub-logins dele
+   *
+   * Sub-login:
+   * - sempre só ele mesmo
+   */
+  function acme_get_credit_table_visible_user_ids(int $resolvedTargetUserId = 0): array
+  {
+    global $wpdb;
+
+    if (!is_user_logged_in()) {
+      return [];
+    }
+
+    $currentUserId = get_current_user_id();
+    $currentUser = wp_get_current_user();
+    $requestUri = isset($_SERVER['REQUEST_URI']) ? (string) wp_unslash($_SERVER['REQUEST_URI']) : '';
+
+    $isMyProfile = (strpos($requestUri, '/my-profile') !== false);
+    $isViewUser  = (strpos($requestUri, '/view-user') !== false);
+    $isEditUser  = (strpos($requestUri, '/edit-user') !== false);
+
+    $targetUserId = $resolvedTargetUserId > 0 ? $resolvedTargetUserId : $currentUserId;
+
+    // my-profile sempre força self
+    if ($isMyProfile) {
+      return [$currentUserId];
+    }
+
+    // Admin
+    if (current_user_can('manage_options')) {
+      if (($isViewUser || $isEditUser) && $targetUserId > 0) {
+        return [$targetUserId];
+      }
+
+      $userIds = get_users([
+        'fields'   => 'ID',
+        'role__in' => ['child', 'grandchild'],
+        'number'   => 2000,
+      ]);
+
+      $userIds = array_map('intval', (array) $userIds);
+
+      if ($targetUserId > 0 && !in_array($targetUserId, $userIds, true)) {
+        $userIds[] = $targetUserId;
+      }
+
+      return array_values(array_unique($userIds));
+    }
+
+    // Master
+    if (acme_user_has_role($currentUser, 'child')) {
+      if (($isViewUser || $isEditUser) && $targetUserId > 0) {
+        return acme_can_view_credit_table_for_user($targetUserId) ? [$targetUserId] : [];
+      }
+
+      $userIds = [$currentUserId];
+
+      if (function_exists('acme_get_grandchildren_of_child')) {
+        $userIds = array_merge($userIds, acme_get_grandchildren_of_child($currentUserId));
+      }
+
+      return array_values(array_unique(array_map('intval', $userIds)));
+    }
+
+    // Sub-login
+    return [$currentUserId];
+  }
+}
+
+if (!function_exists('acme_get_credit_table_rows')) {
+  /**
+   * Lista detalhada:
+   * usuário | serviço | créditos disponíveis | validade
+   *
+   * Agrupa por validade para não misturar lotes com vencimentos diferentes.
+   */
+  function acme_get_credit_table_rows(array $userIds): array
+  {
+    global $wpdb;
+
+    $userIds = array_values(array_filter(array_map('intval', $userIds)));
+    if (empty($userIds)) {
+      return [];
+    }
+
+    $lotsTable = function_exists('acme_table_credit_lots')
+      ? acme_table_credit_lots()
+      : ($wpdb->prefix . 'credit_lots');
+
+    $servicesTable = function_exists('acme_table_services')
+      ? acme_table_services()
+      : ($wpdb->prefix . 'services');
+
+    $usersTable = $wpdb->users;
+    $nowMysql = current_time('mysql');
+
+    $placeholders = implode(',', array_fill(0, count($userIds), '%d'));
+
+    $sql = "
+      SELECT
+        l.owner_user_id AS user_id,
+        u.display_name,
+        u.user_email,
+        s.id AS service_id,
+        s.slug AS service_slug,
+        s.name AS service_name,
+        l.expires_at,
+        COALESCE(SUM(GREATEST(l.credits_total - l.credits_used, 0)), 0) AS available_credits
+      FROM {$lotsTable} l
+      INNER JOIN {$usersTable} u
+        ON u.ID = l.owner_user_id
+      INNER JOIN {$servicesTable} s
+        ON s.id = l.service_id
+      WHERE l.owner_user_id IN ({$placeholders})
+        AND (l.expires_at IS NULL OR l.expires_at >= %s)
+      GROUP BY
+        l.owner_user_id,
+        u.display_name,
+        u.user_email,
+        s.id,
+        s.slug,
+        s.name,
+        l.expires_at
+      HAVING available_credits > 0
+      ORDER BY
+        u.display_name ASC,
+        s.name ASC,
+        l.expires_at ASC
+    ";
+
+    $prepared = $wpdb->prepare($sql, array_merge($userIds, [$nowMysql]));
+    $rows = $wpdb->get_results($prepared, ARRAY_A);
+
+    return is_array($rows) ? $rows : [];
+  }
+}
+
+if (!function_exists('acme_get_credit_table_service_totals')) {
+  /**
+   * Resumo por serviço para Admin e Master.
+   */
+  function acme_get_credit_table_service_totals(array $userIds): array
+  {
+    global $wpdb;
+
+    $userIds = array_values(array_filter(array_map('intval', $userIds)));
+    if (empty($userIds)) {
+      return [];
+    }
+
+    $lotsTable = function_exists('acme_table_credit_lots')
+      ? acme_table_credit_lots()
+      : ($wpdb->prefix . 'credit_lots');
+
+    $servicesTable = function_exists('acme_table_services')
+      ? acme_table_services()
+      : ($wpdb->prefix . 'services');
+
+    $nowMysql = current_time('mysql');
+    $placeholders = implode(',', array_fill(0, count($userIds), '%d'));
+
+    $sql = "
+      SELECT
+        s.id AS service_id,
+        s.slug AS service_slug,
+        s.name AS service_name,
+        COALESCE(SUM(GREATEST(l.credits_total - l.credits_used, 0)), 0) AS total_available
+      FROM {$lotsTable} l
+      INNER JOIN {$servicesTable} s
+        ON s.id = l.service_id
+      WHERE l.owner_user_id IN ({$placeholders})
+        AND (l.expires_at IS NULL OR l.expires_at >= %s)
+      GROUP BY s.id, s.slug, s.name
+      HAVING total_available > 0
+      ORDER BY s.name ASC
+    ";
+
+    $prepared = $wpdb->prepare($sql, array_merge($userIds, [$nowMysql]));
+    $rows = $wpdb->get_results($prepared, ARRAY_A);
+
+    return is_array($rows) ? $rows : [];
+  }
+}
