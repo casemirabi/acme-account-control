@@ -2748,7 +2748,7 @@ add_shortcode('acme_view_user_atual', function () {
     <div style="max-width:820px;margin:0 auto">
         <div
             style="margin-right: auto;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px">
-            <a href="<?php echo site_url('/usuarios'); ?>" style="margin-left: auto;text-decoration:none;">← Voltar</a>
+            <!--<a href="<?php #echo site_url('/usuarios'); ?>" style="margin-left: auto;text-decoration:none;">← Voltar</a>-->
         </div>
     </div>
 

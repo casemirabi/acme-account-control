@@ -2212,3 +2212,86 @@ if (!shortcode_exists('acme_credit_inventory_table')) {
 }
 
 
+if (!function_exists('acme_render_my_profile_page_view')) {
+  function acme_render_my_profile_page_view(array $profileSections = [])
+  {
+    $viewFile = ACME_ACC_PATH . 'includes/views/my-profile-page.php';
+
+    if (!file_exists($viewFile)) {
+      return '<p>View do Meu Perfil não encontrada.</p>';
+    }
+
+    ob_start();
+    require $viewFile;
+    return ob_get_clean();
+  }
+}
+
+if (!function_exists('acme_shortcode_my_profile_page')) {
+  function acme_shortcode_my_profile_page()
+  {
+    if (!is_user_logged_in()) {
+      return '<p>Você precisa estar logado.</p>';
+    }
+
+    // Enfileira CSS da página apenas quando o shortcode é renderizado
+    if (function_exists('acme_enqueue_my_profile_page_assets')) {
+      acme_enqueue_my_profile_page_assets();
+    }
+
+    $inventoryHtml = '';
+    if (shortcode_exists('acme_credit_inventory_table')) {
+      $inventoryHtml = do_shortcode('[acme_credit_inventory_table]');
+    }
+
+    $subscriptionsHtml = shortcode_exists('acme_user_atual')
+      ? do_shortcode('[acme_user_atual]')
+      : '<p>Shortcode de assinaturas não disponível.</p>';
+
+    $snapshotHtml = shortcode_exists('acme_credits_snapshot')
+      ? do_shortcode('[acme_credits_snapshot]')
+      : '<p>Shortcode de histórico não disponível.</p>';
+
+    $userDataHtml = shortcode_exists('acme_view_user_atual')
+      ? do_shortcode('[acme_view_user_atual]')
+      : '<p>Shortcode de dados do usuário não disponível.</p>';
+
+    $profileSections = [
+      'inventory_html'     => $inventoryHtml,
+      'subscriptions_html' => $subscriptionsHtml,
+      'snapshot_html'      => $snapshotHtml,
+      'user_data_html'     => $userDataHtml,
+    ];
+
+    return acme_render_my_profile_page_view($profileSections);
+  }
+}
+
+if (!shortcode_exists('acme_my_profile_page')) {
+  add_shortcode('acme_my_profile_page', 'acme_shortcode_my_profile_page');
+}
+
+if (!function_exists('acme_register_my_profile_page_assets')) {
+  function acme_register_my_profile_page_assets()
+  {
+    $cssRelativePath = 'assets/css/acme-my-profile-page.css';
+    $cssFilePath = ACME_ACC_PATH . $cssRelativePath;
+    $cssFileUrl  = ACME_ACC_URL . $cssRelativePath;
+    $cssVersion  = file_exists($cssFilePath) ? (string) filemtime($cssFilePath) : '1.0.0';
+
+    wp_register_style(
+      'acme-my-profile-page',
+      $cssFileUrl,
+      [],
+      $cssVersion
+    );
+  }
+}
+add_action('wp_enqueue_scripts', 'acme_register_my_profile_page_assets');
+
+if (!function_exists('acme_enqueue_my_profile_page_assets')) {
+  function acme_enqueue_my_profile_page_assets()
+  {
+    wp_enqueue_style('acme-my-profile-page');
+  }
+}
