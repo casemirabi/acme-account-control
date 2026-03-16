@@ -481,12 +481,44 @@ if (!function_exists('acme_clt_build_public_status_response')) {
         ];
       }
 
-            $cpfPublico = $item['cpf_full'] ?? $item['cpf'] ?? $item['cpf_masked'] ?? null;
+      $cpfPublico = $item['cpf_full'] ?? $item['cpf'] ?? $item['cpf_masked'] ?? null;
 
+      $propostasPublicas = [];
+      $capturedResponseBody = $propostas['capturedResponse']['body'] ?? '';
+
+      if (is_string($capturedResponseBody) && $capturedResponseBody !== '') {
+        $propostasDecodificadas = json_decode($capturedResponseBody, true);
+
+        if (is_array($propostasDecodificadas)) {
+          foreach ($propostasDecodificadas as $proposta) {
+            if (!is_array($proposta)) {
+              continue;
+            }
+
+            $tipoCredito = is_array($proposta['tipoCredito'] ?? null) ? $proposta['tipoCredito'] : [];
+
+            $propostasPublicas[] = [
+              'id' => $proposta['id'] ?? null,
+              'nome' => $proposta['nome'] ?? null,
+              'prazo' => $proposta['prazo'] ?? null,
+              'taxaJuros' => $proposta['taxaJuros'] ?? null,
+              'valorLiberado' => $proposta['valorLiberado'] ?? null,
+              'valorParcela' => $proposta['valorParcela'] ?? null,
+              'taxaSeguro' => $proposta['taxaSeguro'] ?? null,
+              'valorSeguro' => $proposta['valorSeguro'] ?? null,
+              'tipoCredito' => [
+                'id' => $tipoCredito['id'] ?? null,
+                'name' => $tipoCredito['name'] ?? null,
+              ],
+              'type' => $proposta['type'] ?? null,
+            ];
+          }
+        }
+      }
 
       $dadosNormalizados[] = [
         'ok' => (bool) ($item['ok'] ?? false),
-        'numeroDocumento' => $cpfPublico,//$item['cpf_masked'] ?? $item['cpf'] ?? null,
+        'numeroDocumento' => $cpfPublico, //$item['cpf_masked'] ?? $item['cpf'] ?? null,
         'nome' => $item['nome'] ?? null,
         'status' => $item['status'] ?? [],
         'vinculos' => $vinculosPublicos,
@@ -498,11 +530,9 @@ if (!function_exists('acme_clt_build_public_status_response')) {
           'cnpjEmpregador' => $margem['cnpjEmpregador'] ?? null,
           'dataAdmissao' => $margem['dataAdmissao'] ?? null,
         ],
-        'propostas' => [
-          'source' => $propostas['source'] ?? null,
-          'error' => $propostas['error'] ?? null,
-          'message' => $propostas['message'] ?? null,
-        ],
+        'propostas' => !empty($propostasPublicas)
+          ? $propostasPublicas
+          : 'Não há propostas disponíveis no momento.',
       ];
     }
 

@@ -1,0 +1,971 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Documentação da API CLT</title>
+  <style>
+    :root {
+      --acme-blue: #0b1db8;
+      --acme-blue-dark: #08158d;
+      --acme-text: #1f2937;
+      --acme-muted: #6b7280;
+      --acme-bg: #f3f4f6;
+      --acme-card: #ffffff;
+      --acme-border: #e5e7eb;
+      --acme-success: #047857;
+      --acme-warning: #b45309;
+      --acme-danger: #b91c1c;
+      --acme-code-bg: #111827;
+      --acme-code-text: #d1fae5;
+      --acme-shadow: 0 10px 25px rgba(15, 23, 42, 0.08);
+      --acme-radius: 18px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      font-family: Arial, Helvetica, sans-serif;
+      background: var(--acme-bg);
+      color: var(--acme-text);
+      line-height: 1.6;
+    }
+
+    .acme-docs {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 0 20px 60px;
+    }
+
+    .acme-hero {
+      background: linear-gradient(135deg, var(--acme-blue) 0%, var(--acme-blue-dark) 100%);
+      color: #fff;
+      border-radius: 0 0 28px 28px;
+      padding: 28px 24px 32px;
+      margin-bottom: 28px;
+      box-shadow: var(--acme-shadow);
+    }
+
+    .acme-hero-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .acme-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(255, 255, 255, 0.14);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      padding: 8px 14px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .acme-hero h1 {
+      margin: 18px 0 8px;
+      font-size: 38px;
+      line-height: 1.1;
+    }
+
+    .acme-hero p {
+      margin: 0;
+      font-size: 16px;
+      color: rgba(255, 255, 255, 0.92);
+      max-width: 980px;
+    }
+
+    .acme-layout {
+      display: grid;
+      grid-template-columns: 280px minmax(0, 1fr);
+      gap: 24px;
+      align-items: start;
+    }
+
+    .acme-sidebar {
+      position: sticky;
+      top: 18px;
+      background: var(--acme-card);
+      border: 1px solid var(--acme-border);
+      border-radius: var(--acme-radius);
+      padding: 18px;
+      box-shadow: var(--acme-shadow);
+    }
+
+    .acme-sidebar h3 {
+      margin: 0 0 12px;
+      font-size: 16px;
+      color: var(--acme-blue);
+    }
+
+    .acme-sidebar a {
+      display: block;
+      text-decoration: none;
+      color: var(--acme-text);
+      padding: 10px 12px;
+      border-radius: 12px;
+      font-size: 14px;
+      transition: 0.2s ease;
+    }
+
+    .acme-sidebar a:hover {
+      background: #eef2ff;
+      color: var(--acme-blue);
+    }
+
+    .acme-content {
+      min-width: 0;
+    }
+
+    .acme-section {
+      background: var(--acme-card);
+      border: 1px solid var(--acme-border);
+      border-radius: var(--acme-radius);
+      padding: 26px;
+      margin-bottom: 22px;
+      box-shadow: var(--acme-shadow);
+    }
+
+    .acme-section h2 {
+      margin: 0 0 8px;
+      color: var(--acme-blue);
+      font-size: 30px;
+      line-height: 1.2;
+    }
+
+    .acme-section h3 {
+      margin: 24px 0 10px;
+      color: var(--acme-blue);
+      font-size: 22px;
+      line-height: 1.3;
+    }
+
+    .acme-section h4 {
+      margin: 18px 0 8px;
+      color: #111827;
+      font-size: 17px;
+    }
+
+    .acme-subtitle {
+      margin: 0 0 20px;
+      color: var(--acme-muted);
+      font-size: 15px;
+    }
+
+    .acme-grid-2 {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    .acme-info-card {
+      background: #f9fafb;
+      border: 1px solid var(--acme-border);
+      border-radius: 16px;
+      padding: 18px;
+    }
+
+    .acme-info-card h4 {
+      margin-top: 0;
+      color: var(--acme-blue);
+    }
+
+    .acme-endpoints {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+    }
+
+    .acme-endpoint-box {
+      border: 1px solid var(--acme-border);
+      background: #fff;
+      border-radius: 16px;
+      padding: 20px;
+      text-align: center;
+    }
+
+    .acme-endpoint-label {
+      color: var(--acme-muted);
+      font-size: 14px;
+      margin-bottom: 8px;
+    }
+
+    .acme-method {
+      display: inline-block;
+      font-weight: 700;
+      font-size: 14px;
+      border-radius: 10px;
+      padding: 6px 10px;
+      margin-right: 8px;
+      min-width: 58px;
+      text-align: center;
+    }
+
+    .acme-method.post {
+      background: #dbeafe;
+      color: #1d4ed8;
+    }
+
+    .acme-method.get {
+      background: #dcfce7;
+      color: #15803d;
+    }
+
+    .acme-inline-code {
+      font-family: Consolas, Monaco, monospace;
+      background: #f3f4f6;
+      padding: 4px 7px;
+      border-radius: 8px;
+      font-size: 13px;
+      color: #111827;
+    }
+
+    .acme-code-block {
+      background: var(--acme-code-bg);
+      color: var(--acme-code-text);
+      border-radius: 16px;
+      overflow: auto;
+      padding: 18px 20px;
+      border: 1px solid #1f2937;
+      font-family: Consolas, Monaco, monospace;
+      font-size: 13px;
+      line-height: 1.7;
+      white-space: pre;
+      margin: 12px 0 0;
+    }
+
+    .acme-note,
+    .acme-warning-box,
+    .acme-success-box {
+      border-radius: 14px;
+      padding: 16px 18px;
+      margin-top: 16px;
+      font-size: 14px;
+    }
+
+    .acme-note {
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      color: #1e3a8a;
+    }
+
+    .acme-warning-box {
+      background: #fff7ed;
+      border: 1px solid #fdba74;
+      color: #9a3412;
+    }
+
+    .acme-success-box {
+      background: #ecfdf5;
+      border: 1px solid #86efac;
+      color: #065f46;
+    }
+
+    .acme-table-wrap {
+      overflow: auto;
+      margin-top: 14px;
+      border-radius: 14px;
+      border: 1px solid var(--acme-border);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #fff;
+      min-width: 760px;
+    }
+
+    th,
+    td {
+      padding: 14px 14px;
+      border-bottom: 1px solid var(--acme-border);
+      text-align: left;
+      vertical-align: top;
+      font-size: 14px;
+    }
+
+    th {
+      background: #f8fafc;
+      color: var(--acme-blue);
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    .acme-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: 700;
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .acme-status.pending {
+      background: #fef3c7;
+      color: #92400e;
+    }
+
+    .acme-status.processing {
+      background: #dbeafe;
+      color: #1d4ed8;
+    }
+
+    .acme-status.completed {
+      background: #dcfce7;
+      color: #166534;
+    }
+
+    .acme-status.failed {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+
+    .acme-list {
+      margin: 10px 0 0;
+      padding-left: 18px;
+    }
+
+    .acme-list li {
+      margin-bottom: 8px;
+    }
+
+    .acme-footer {
+      text-align: center;
+      color: var(--acme-muted);
+      font-size: 13px;
+      padding: 18px 10px 0;
+    }
+
+    .acme-anchor-offset {
+      scroll-margin-top: 20px;
+    }
+
+    @media (max-width: 1024px) {
+      .acme-layout {
+        grid-template-columns: 1fr;
+      }
+
+      .acme-sidebar {
+        position: static;
+      }
+    }
+
+    @media (max-width: 768px) {
+      .acme-hero h1 {
+        font-size: 30px;
+      }
+
+      .acme-grid-2,
+      .acme-endpoints {
+        grid-template-columns: 1fr;
+      }
+
+      .acme-section {
+        padding: 20px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="acme-docs">
+    <header class="acme-hero">
+      <div class="acme-hero-top">
+        <div class="acme-badge">📘 Documentação técnica</div>
+        <div class="acme-badge">API CLT</div>
+      </div>
+      <h1 style="color: #dcfce7 !important;">Visão geral da API CLT</h1>
+      <p>
+        Esta documentação foi criada para clientes e integradores que precisam consumir os endpoints públicos do serviço
+        de consulta CLT.
+        Aqui você encontra autenticação, fluxo da integração, exemplos de uso, status possíveis, respostas da API
+        e orientações para tratamento de erro.
+      </p>
+    </header>
+
+    <div class="acme-layout">
+      <aside class="acme-sidebar">
+        <h3>Índice da documentação</h3>
+        <a href="#visao-geral">Visão geral</a>
+        <a href="#autenticacao">Autenticação</a>
+        <a href="#fluxo">Fluxo da consulta</a>
+        <a href="#endpoints">Endpoints</a>
+        <a href="#requisicao">Estrutura da requisição</a>
+        <a href="#status">Consulta de status</a>
+        <a href="#respostas">Respostas da API</a>
+        <a href="#status-possiveis">Status possíveis</a>
+        <a href="#erros">Erros e falhas</a>
+        <a href="#boas-praticas">Boas práticas</a>
+        <a href="#seguranca">Segurança</a>
+      </aside>
+
+      <main class="acme-content">
+        <section id="visao-geral" class="acme-section acme-anchor-offset">
+          <h2>Visão geral</h2>
+          <p class="acme-subtitle">
+            Guia de instruções da API CLT para integração externa.
+          </p>
+
+          <div class="acme-grid-2">
+            <div class="acme-info-card">
+              <h4>Objetivo da API</h4>
+              <ul class="acme-list">
+                <li>Permitir consultar vínculos empregatícios utilizando o CPF.</li>
+                <li>Iniciar a requisição de consulta de forma segura e rastreável.</li>
+                <li>Acompanhar o processamento por meio de um <span class="acme-inline-code">request_id</span>.</li>
+                <li>Obter o resultado final da consulta.</li>
+              </ul>
+            </div>
+
+            <div class="acme-info-card">
+              <h4>Fluxo básico</h4>
+              <ul class="acme-list">
+                <li>O cliente envia o CPF para o endpoint de criação da consulta.</li>
+                <li>A API valida autenticação, formato do CPF e disponibilidade de crédito.</li>
+                <li>A requisição é registrada com um identificador próprio.</li>
+                <li>O cliente acompanha o resultado pelo endpoint de status.</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section id="autenticacao" class="acme-section acme-anchor-offset">
+          <h2>Autenticação</h2>
+          <p class="acme-subtitle">
+            O acesso externo é protegido por chave de API enviada no cabeçalho HTTP.
+          </p>
+
+          <h3>Header obrigatório</h3>
+          <div class="acme-code-block">x-acme-key: SUA_CHAVE_DE_API
+            Content-Type: application/json</div>
+
+          <h3>Regras importantes</h3>
+          <ul class="acme-list">
+            <li>A chave de API é obrigatória para iniciar a consulta.</li>
+            <li>A chave de API também é obrigatória para consultar o status.</li>
+            <li>Requisições sem autenticação válida retornam erro de acesso.</li>
+          </ul>
+        </section>
+
+        <section id="fluxo" class="acme-section acme-anchor-offset">
+          <h2>Fluxo da consulta</h2>
+          <p class="acme-subtitle">
+            Entenda a sequência de ponta a ponta para integração segura.
+          </p>
+
+          <div class="acme-grid-2">
+            <div class="acme-info-card">
+              <h4>Etapas</h4>
+              <ol class="acme-list">
+                <li>Enviar CPF para o endpoint <span class="acme-inline-code">POST /api-clt</span>.</li>
+                <li>Receber <span class="acme-inline-code">request_id</span> e status inicial.</li>
+                <li>Consultar o endpoint <span class="acme-inline-code">GET /api-clt-status</span>.</li>
+                <li>Acompanhar a consulta até a finalização.</li>
+              </ol>
+            </div>
+
+            <div class="acme-info-card">
+              <h4>Identificador da consulta</h4>
+              <ul class="acme-list">
+                <li><span class="acme-inline-code">request_id</span>: identificador da requisição. É o principal ID para
+                  consulta de status.</li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="acme-success-box">
+            Recomendação operacional: grave o <span class="acme-inline-code">request_id</span> no seu sistema
+            imediatamente após o POST.
+            Sem ele, o acompanhamento da consulta não poderá ser feito corretamente.
+          </div>
+        </section>
+
+        <section id="endpoints" class="acme-section acme-anchor-offset">
+          <h2>Endpoints da API</h2>
+          <p class="acme-subtitle">
+            Estes são os endpoints públicos utilizados pelo integrador.
+          </p>
+
+          <div class="acme-endpoints">
+            <div class="acme-endpoint-box">
+              <div class="acme-endpoint-label">Endpoint de requisição</div>
+              <div>
+                <span class="acme-method post">POST</span>
+                <span class="acme-inline-code">/api-clt</span>
+              </div>
+            </div>
+
+            <div class="acme-endpoint-box">
+              <div class="acme-endpoint-label">Endpoint de status</div>
+              <div>
+                <span class="acme-method get">GET</span>
+                <span class="acme-inline-code">/api-clt-status</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="requisicao" class="acme-section acme-anchor-offset">
+          <h2>Estrutura da requisição</h2>
+          <p class="acme-subtitle">
+            Conteúdo esperado no envio de uma nova consulta CLT.
+          </p>
+
+          <h3>Body mínimo obrigatório</h3>
+          <div class="acme-code-block">{
+            "cpf": "12345678900"
+            }</div>
+
+          <div class="acme-table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Campo</th>
+                  <th>Tipo</th>
+                  <th>Obrigatório</th>
+                  <th>Descrição</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><span class="acme-inline-code">cpf</span></td>
+                  <td>string</td>
+                  <td>Sim</td>
+                  <td>CPF com 11 dígitos numéricos, sem máscara.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <h3>Regras de envio do CPF</h3>
+          <ul class="acme-list">
+            <li>Envie somente números.</li>
+            <li>Não envie pontos, traços ou espaços.</li>
+            <li>Se o CPF tiver quantidade inválida de dígitos, a API retorna erro 400.</li>
+          </ul>
+
+          <h4>Exemplo correto</h4>
+          <div class="acme-code-block">12345678900</div>
+
+          <h4>Exemplo incorreto</h4>
+          <div class="acme-code-block">123.456.789-00</div>
+
+          <h3>Exemplo em cURL</h3>
+          <div class="acme-code-block">curl --request POST "https://maiscorban.net/api-clt" \
+            --header "Content-Type: application/json" \
+            --header "x-acme-key: SUA_CHAVE_DE_API" \
+            --data '{
+            "cpf": "12345678900"
+            }'</div>
+
+          <h3>Exemplo em PowerShell</h3>
+          <div class="acme-code-block">$headers = @{
+            "Content-Type" = "application/json"
+            "x-acme-key" = "SUA_CHAVE_DE_API"
+            }
+
+            $body = @{
+            cpf = "12345678900"
+            } | ConvertTo-Json
+
+            Invoke-RestMethod `
+            -Uri "https://maiscorban.net/api-clt" `
+            -Method Post `
+            -Headers $headers `
+            -Body $body</div>
+        </section>
+
+        <section id="status" class="acme-section acme-anchor-offset">
+          <h2>Consulta de status</h2>
+          <p class="acme-subtitle">
+            Endpoint usado para acompanhar o andamento da consulta previamente criada.
+          </p>
+
+          <h3>Parâmetro obrigatório</h3>
+          <div class="acme-code-block">request_id=clt_0ab12c345678</div>
+
+          <h3>Exemplo de chamada</h3>
+          <div class="acme-code-block">GET /api-clt-status?request_id=clt_0ab12c345678</div>
+
+          <h3>Exemplo em cURL</h3>
+          <div class="acme-code-block">curl --request GET
+            "https://maiscorban.net/api-clt-status?request_id=clt_0ab12c345678" \
+            --header "x-acme-key: SUA_CHAVE_DE_API"</div>
+
+          <h3>Exemplo em PowerShell</h3>
+          <div class="acme-code-block">$headers = @{
+            "x-acme-key" = "SUA_CHAVE_DE_API"
+            }
+
+            Invoke-RestMethod `
+            -Uri "https://maiscorban.net/api-clt-status?request_id=clt_0ab12c345678" `
+            -Method Get `
+            -Headers $headers</div>
+        </section>
+
+        <section id="respostas" class="acme-section acme-anchor-offset">
+          <h2>Respostas da API</h2>
+          <p class="acme-subtitle">
+            Abaixo estão os formatos de resposta mais importantes para o integrador.
+          </p>
+
+          <h3>Resposta ao iniciar a consulta</h3>
+          <div class="acme-code-block">{
+            "success": true,
+            "message": "Consulta CLT iniciada. Acompanhe pelo request_id ou aguarde o webhook.",
+            "request_id": "clt_0ab12c345678",
+            "credits": 3,
+            "status": "pending"
+            }</div>
+
+          <h3>Resposta do endpoint de status em processamento</h3>
+          <div class="acme-code-block">{
+            "success": true,
+            "data": {
+            "request_id": "clt_0ab12c345678",
+            "provider_request_id": "clt_0ab12c345678",
+            "cpf": "123.***.***-00",
+            "status": "pending",
+            "created_at": "2026-03-13 16:00:19",
+            "updated_at": "2026-03-13 16:00:19",
+            "completed_at": null
+            }
+            }</div>
+
+          <h3>Resposta do endpoint de status concluída</h3>
+          <div class="acme-code-block">{
+    "success": true,
+    "data": {
+        "request_id": "clt_0ab12c345678",
+        "provider_request_id": "clt_0ab12c345678",
+        "cpf": "123.***.***-00",
+        "status": "completed",
+        "created_at": "2026-03-13 16:00:19",
+        "updated_at": "2026-03-13 16:03:53",
+        "completed_at": "2026-03-13 16:03:53",
+        "response_data": {
+            "dados": [
+                {
+                    "ok": true,
+                    "numeroDocumento": "12345678900",
+                    "nome": "JOAO SILVA",
+                    "status": [
+                        "Termo de autorização aceito.",
+                        "Consultando vinculos empregaticios.",
+                        "Consulta realizada com sucesso",
+                        "Termo de autorização aceito.",
+                        "Consultando margem privada.",
+                        "Consulta realizada com sucesso"
+                    ],
+                    "vinculos": [
+                        {
+                            "elegivel": true,
+                            "numeroRegistro": "XXXXXXXX"
+                        }
+                    ],
+                    "margem": {
+                        "valorMargemDisponivel": 479.94,
+                        "valorMargemBase": 1371.27,
+                        "valorTotalDevido": 8927.46,
+                        "registroEmpregaticio": "XXXXXXXX",
+                        "cnpjEmpregador": "12345678",
+                        "dataAdmissao": "2024-11-01"
+                    },
+                    "propostas": [
+                        {
+                            "id": 8415,
+                            "nome": "Privado CLT - C/seg 12x 6,99% R",
+                            "prazo": 12,
+                            "taxaJuros": 6.99,
+                            "valorLiberado": 2691.9,
+                            "valorParcela": 479.94,
+                            "taxaSeguro": 0,
+                            "valorSeguro": 0,
+                            "tipoCredito": {
+                                "id": 1,
+                                "name": "Novo"
+                            },
+                            "type": "credito-privado-bpn"
+                        },
+                        {
+                            "id": 8416,
+                            "nome": "Privado CLT - C/seg 36x 6,99% R",
+                            "prazo": 36,
+                            "taxaJuros": 6.99,
+                            "valorLiberado": 4360.06,
+                            "valorParcela": 479.94,
+                            "taxaSeguro": 0,
+                            "valorSeguro": 0,
+                            "tipoCredito": {
+                                "id": 1,
+                                "name": "Novo"
+                            },
+                            "type": "credito-privado-bpn"
+                        },
+                        {
+                            "id": 8414,
+                            "nome": "Privado CLT - C/seg 24x 6,99% R",
+                            "prazo": 24,
+                            "taxaJuros": 6.99,
+                            "valorLiberado": 3849.4,
+                            "valorParcela": 479.94,
+                            "taxaSeguro": 0,
+                            "valorSeguro": 0,
+                            "tipoCredito": {
+                                "id": 1,
+                                "name": "Novo"
+                            },
+                            "type": "credito-privado-bpn"
+                        },
+                        {
+                            "id": 8417,
+                            "nome": "Privado CLT - C/seg 6x 6,99% R",
+                            "prazo": 6,
+                            "taxaJuros": 6.99,
+                            "valorLiberado": 1635.06,
+                            "valorParcela": 479.94,
+                            "taxaSeguro": 0,
+                            "valorSeguro": 0,
+                            "tipoCredito": {
+                                "id": 1,
+                                "name": "Novo"
+                            },
+                            "type": "credito-privado-bpn"
+                        }
+                    ]
+                }
+            ]
+        },
+        "message": "Consulta CLT concluída."
+    }
+}</div>
+
+          <h3>Resposta do endpoint de status Não Elegível </h3>
+          <div class="acme-code-block">{
+    "success": true,
+    "data": {
+        "request_id": "clt_0ab12c345678",
+        "provider_request_id": "clt_0ab12c345678",
+        "cpf": "123.***.***-00",
+        "status": "completed",
+        "created_at": "2026-03-13 16:26:04",
+        "updated_at": "2026-03-13 16:26:25",
+        "completed_at": "2026-03-13 16:26:25",
+        "business_warning": {
+            "code": "nao_elegivel",
+            "message": "CPF consultado, mas nenhum vínculo está elegível para simulação."
+        },
+        "message": "Consulta CLT concluída."
+    }
+}</div>
+
+            <h3>Resposta do endpoint de status com falha</h3>
+          <div class="acme-code-block">{
+    "success": true,
+    "data": {
+        "request_id": "clt_0ab12c345678",
+        "cpf": "123.***.***-00",
+        "status": "failed",
+        "created_at": "2026-03-11 16:25:43",
+        "updated_at": "2026-03-11 16:26:13",
+        "completed_at": "2026-03-11 16:26:13",
+        "error": {
+            "code": "FAILED",
+            "message": "Falha na consulta"
+        }
+    }
+}</div>
+        </section>
+
+        <section id="status-possiveis" class="acme-section acme-anchor-offset">
+          <h2>Status possíveis</h2>
+          <p class="acme-subtitle">
+            Estes são os status relevantes para o integrador no consumo da API.
+          </p>
+
+          <div class="acme-table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Status</th>
+                  <th>Significado</th>
+                  <th>Ação recomendada</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><span class="acme-status pending">pending</span></td>
+                  <td>A requisição foi criada e está aguardando processamento ou retorno.</td>
+                  <td>Consultar novamente após alguns segundos.</td>
+                </tr>
+
+                <tr>
+                  <td><span class="acme-status completed">completed</span></td>
+                  <td>A consulta foi concluída e o resultado já pode ser consumido em <span
+                      class="acme-inline-code">response_data</span>.</td>
+                  <td>Ler, persistir e encerrar o fluxo.</td>
+                </tr>
+                <tr>
+                  <td><span class="acme-status failed">failed</span></td>
+                  <td>A consulta foi encerrada com falha e contém informações em <span
+                      class="acme-inline-code">error</span>.</td>
+                  <td>Registrar o erro e decidir se haverá nova tentativa.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section id="erros" class="acme-section acme-anchor-offset">
+          <h2>Erros e falhas</h2>
+          <p class="acme-subtitle">
+            Estes são os erros mais relevantes para integração e suporte.
+          </p>
+
+          <div class="acme-table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>HTTP</th>
+                  <th>Código</th>
+                  <th>Quando acontece</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>400</td>
+                  <td><span class="acme-inline-code">INVALID_CPF</span></td>
+                  <td>CPF ausente ou com quantidade inválida de dígitos.</td>
+                </tr>
+                <tr>
+                  <td>400</td>
+                  <td><span class="acme-inline-code">MISSING_REQUEST_ID</span></td>
+                  <td>Consulta de status sem o parâmetro <span class="acme-inline-code">request_id</span>.</td>
+                </tr>
+                <tr>
+                  <td>401</td>
+                  <td><span class="acme-inline-code">NOT_AUTHENTICATED</span></td>
+                  <td>Chave de API ausente ou inválida.</td>
+                </tr>
+                <tr>
+                  <td>402</td>
+                  <td><span class="acme-inline-code">NO_CREDITS</span></td>
+                  <td>Sem créditos disponíveis para realizar a consulta.</td>
+                </tr>
+                <tr>
+                  <td>404</td>
+                  <td><span class="acme-inline-code">NOT_FOUND</span></td>
+                  <td><span class="acme-inline-code">request_id</span> não encontrado.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+<h3>Exemplo de situação quando não houver créditos</h3>
+          <div class="acme-code-block">{
+    "success": false,
+    "error": {
+        "code": "NO_CREDITS",
+        "message": "Sem créditos"
+    }
+}</div>
+
+          <h3>Exemplo de erro de autenticação</h3>
+          <div class="acme-code-block">{
+    "success": false,
+    "error": {
+        "code": "NOT_AUTHENTICATED",
+        "message": "Você precisa estar logado ou informar uma API key válida."
+    }
+}</div>
+
+          <h3>Exemplo de erro de CPF inválido</h3>
+          <div class="acme-code-block">{
+    "success": false,
+    "error": {
+        "code": "INVALID_CPF",
+        "message": "CPF inválido. Deve conter 11 dígitos."
+    }
+}</div>
+
+          <h3>Exemplo de erro por request_id ausente</h3>
+          <div class="acme-code-block">{
+    "success": false,
+    "error": {
+        "code": "MISSING_REQUEST_ID",
+        "message": "request_id obrigatório"
+    }
+}</div>
+        </section>
+
+        <section id="boas-praticas" class="acme-section acme-anchor-offset">
+          <h2>Boas práticas de integração</h2>
+          <p class="acme-subtitle">
+            Regras recomendadas para reduzir falhas operacionais e evitar consumo desnecessário de recursos.
+          </p>
+
+          <ul class="acme-list">
+            <li>Armazene o <span class="acme-inline-code">request_id</span> imediatamente após criar a consulta.</li>
+            <li>Faça o acompanhamento com intervalo moderado entre as tentativas.</li>
+            <li>Não dispare várias consultas simultâneas para o mesmo CPF sem necessidade operacional clara.</li>
+            <li>Trate separadamente erro técnico e resultado de negócio.</li>
+            <li>Registre logs da integração no seu sistema, mas nunca grave a chave da API em texto aberto.</li>
+          </ul>
+
+          <div class="acme-warning-box">
+            Evite interpretar o status apenas pelo texto da mensagem. O comportamento correto é sempre usar os campos
+            estruturados
+            como <span class="acme-inline-code">success</span>, <span class="acme-inline-code">status</span>, <span
+              class="acme-inline-code">error</span> e
+            <span class="acme-inline-code">response_data</span>.
+          </div>
+        </section>
+
+        <section id="seguranca" class="acme-section acme-anchor-offset">
+          <h2>Segurança e observações finais</h2>
+          <p class="acme-subtitle">
+            Regras importantes para uso correto do endpoint público.
+          </p>
+
+          <ul class="acme-list">
+            <li>A chave enviada em <span class="acme-inline-code">x-acme-key</span> deve ser mantida em ambiente seguro.
+            </li>
+            <li>Não exponha a chave em front-end público, aplicativos sem proteção ou logs de navegador.</li>
+            <li>Os resultados podem retornar CPF mascarado no fluxo de status.</li>
+          </ul>
+
+          <div class="acme-success-box">
+            Em caso de dúvida de integração, utilize primeiro o fluxo mínimo:
+            criar consulta com CPF válido, guardar o <span class="acme-inline-code">request_id</span> e consultar o
+            status até a finalização.
+          </div>
+        </section>
+
+        <div class="acme-footer">
+          Documentação técnica da API CLT
+        </div>
+      </main>
+    </div>
+  </div>
+</body>
+
+</html>
