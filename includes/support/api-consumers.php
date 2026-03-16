@@ -302,6 +302,16 @@ if (!function_exists('acme_touch_api_consumer_usage')) {
 }
 
 if (!function_exists('acme_validate_api_key')) {
+
+  if (function_exists('acme_api_public_is_enabled')) {
+    if (!acme_api_public_is_enabled()) {
+      return new WP_Error(
+        'api_disabled',
+        'Public API disabled',
+        ['status' => 503]
+      );
+    }
+  }
   function acme_validate_api_key(string $plainApiKey, string $serviceSlug = 'clt')
   {
     $plainApiKey = trim($plainApiKey);

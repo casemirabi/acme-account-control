@@ -118,6 +118,10 @@ acme_safe_require(__DIR__ . '/includes/models/credits-lots.php', false);
 
 acme_safe_require(__DIR__ . '/includes/support/role-labels.php', false);
 
+acme_safe_require(__DIR__ . '/includes/support/api-global-control.php', true);
+acme_safe_require(__DIR__ . '/includes/controllers/api-consumers-frontend.php', true);
+
+
 /**
  * ⚠️ IMPORTANTÍSSIMO EM PRODUÇÃO:
  * Verifique se o nome do arquivo é exatamente "clt-async.php" no servidor (case-sensitive).
@@ -130,6 +134,9 @@ acme_safe_require(ACME_ACC_PATH . 'includes/controllers/pbank-async.php', false)
 
 acme_safe_require(__DIR__ . '/includes/services/reports-export.php', false);
 acme_safe_require(__DIR__ . '/includes/support/reports.php', false);
+
+
+
 
 
 /**

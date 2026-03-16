@@ -1,0 +1,284 @@
+.acme-api-panel {
+    padding: 24px;
+    background: #f3f4f6;
+    border-radius: 16px;
+    margin: 24px 0;
+    color: #0f172a;
+}
+
+.acme-api-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.acme-api-panel-header h2 {
+    margin: 0 0 8px;
+    font-size: 40px;
+    line-height: 1.1;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+.acme-api-panel-subtitle {
+    margin: 0;
+    font-size: 16px;
+    color: #64748b;
+}
+
+.acme-api-admin-badge {
+    display: inline-block;
+    background: #e0ecff;
+    color: #2563eb;
+    padding: 8px 14px;
+    border-radius: 999px;
+    font-size: 14px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.acme-api-card {
+    background: #ffffff;
+    border-radius: 18px;
+    padding: 24px;
+    margin-bottom: 24px;
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+}
+
+.acme-api-card h3 {
+    margin: 0 0 12px;
+    font-size: 20px;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+.acme-api-status-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.acme-api-status-text {
+    font-size: 18px;
+    color: #475569;
+    margin: 0 0 10px;
+}
+
+.acme-api-status-pill {
+    display: inline-block;
+    padding: 6px 12px;
+    border-radius: 999px;
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.acme-api-status-pill.active {
+    background: #dcfce7;
+    color: #16a34a;
+}
+
+.acme-api-status-pill.disabled {
+    background: #fee2e2;
+    color: #dc2626;
+}
+
+.acme-api-status-description {
+    margin: 0;
+    color: #64748b;
+    font-size: 16px;
+}
+
+.acme-api-actions {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.acme-api-button {
+    border: 0;
+    border-radius: 12px;
+    padding: 14px 20px;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    text-decoration: none;
+}
+
+.acme-api-button-danger {
+    background: #ef4444;
+    color: #ffffff;
+}
+
+.acme-api-button-success {
+    background: #16a34a;
+    color: #ffffff;
+}
+
+.acme-api-grid {
+    display: grid;
+    grid-template-columns: 1.1fr 1fr;
+    gap: 24px;
+    margin-bottom: 24px;
+}
+
+.acme-api-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+}
+
+.acme-api-summary-card {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    padding: 18px;
+}
+
+.acme-api-summary-label {
+    display: block;
+    color: #64748b;
+    font-size: 15px;
+    margin-bottom: 6px;
+}
+
+.acme-api-summary-value {
+    display: block;
+    font-size: 32px;
+    line-height: 1;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+.acme-api-form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.acme-api-field label {
+    display: block;
+    font-size: 14px;
+    font-weight: 700;
+    color: #0f172a;
+    margin-bottom: 8px;
+}
+
+.acme-api-field input,
+.acme-api-field select {
+    width: 100%;
+    border: 1px solid #dbe1ea;
+    border-radius: 12px;
+    padding: 14px 16px;
+    font-size: 16px;
+    background: #f8fafc;
+    color: #0f172a;
+}
+
+.acme-api-service-list {
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+    margin: 8px 0 24px;
+}
+
+.acme-api-service-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: #1e293b;
+    font-size: 16px;
+}
+
+.acme-api-table-wrap {
+    overflow-x: auto;
+}
+
+.acme-api-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: #ffffff;
+}
+
+.acme-api-table th,
+.acme-api-table td {
+    padding: 14px 12px;
+    border-bottom: 1px solid #e2e8f0;
+    text-align: left;
+    color: #334155;
+    font-size: 15px;
+}
+
+.acme-api-table th {
+    color: #64748b;
+    font-weight: 700;
+}
+
+.acme-api-toolbar {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.acme-api-filter {
+    min-width: 180px;
+}
+
+.acme-api-bulk-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+}
+
+.acme-api-tag {
+    display: inline-block;
+    padding: 5px 12px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.acme-api-tag-active {
+    background: #dcfce7;
+    color: #16a34a;
+}
+
+.acme-api-tag-inactive {
+    background: #fef3c7;
+    color: #d97706;
+}
+
+.acme-api-tag-revoked {
+    background: #fee2e2;
+    color: #dc2626;
+}
+
+.acme-api-panel-message {
+    padding: 16px;
+    background: #fff4e5;
+    border: 1px solid #f0c36d;
+    border-radius: 10px;
+    color: #7a4b00;
+    margin: 20px 0;
+}
+
+@media (max-width: 980px) {
+    .acme-api-grid,
+    .acme-api-summary-grid,
+    .acme-api-form-row {
+        grid-template-columns: 1fr;
+    }
+
+    .acme-api-panel-header,
+    .acme-api-status-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+}
