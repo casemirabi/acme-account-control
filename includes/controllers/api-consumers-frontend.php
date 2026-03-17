@@ -14,8 +14,13 @@ if (!function_exists('acme_api_control_panel_shortcode')) {
             return '<div class="acme-api-panel-message">Faça login para acessar este painel.</div>';
         }
 
-        if (!current_user_can('manage_options')) {
+        /*if (!current_user_can('manage_options')) {
             return '<div class="acme-api-panel-message">Você não tem permissão para acessar este painel.</div>';
+            
+        }*/
+
+        if (!current_user_can('manage_options')) {
+            return '<script>window.location.href="' . esc_url(home_url('/sem-permissao/')) . '";</script>';
         }
 
         acme_api_control_panel_handle_post();

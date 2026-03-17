@@ -461,7 +461,7 @@ add_action('template_redirect', function () {
 
   // 🔒 NOVA REGRA: API global bloqueada
   if (function_exists('acme_api_public_is_enabled') && !acme_api_public_is_enabled()) {
-    wp_safe_redirect(home_url('/api-indisponivel/'));
+    wp_safe_redirect(home_url('/sem-permissao/'));
     exit;
   }
 
