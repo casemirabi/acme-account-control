@@ -883,7 +883,7 @@ add_shortcode('acme_credits_snapshot', function () {
     <div class="acme-history">
       <div class="acme-history-head">
         <div class="acme-history-title">Histórico</div>
-        <div class="acme-history-sub">Últimas <?php echo (int) $history_limit; ?> movimentações (success)</div>
+        <div class="acme-history-sub">Últimas <?php echo (int) $history_limit; ?> movimentações (sucesso)</div>
         <div class=""><?php echo do_shortcode('[acme_export_button report="credits_extract_last20"]'); ?></div>
       </div>
 

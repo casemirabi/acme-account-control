@@ -102,7 +102,7 @@
     border: 0;
     border-radius: 12px;
     padding: 14px 20px;
-    font-size: 14px;
+    font-size: 12px;
     font-weight: 700;
     cursor: pointer;
     text-decoration: none;
@@ -324,4 +324,267 @@
 
 .acme-api-key-meta {
     font-size: 12px;
+}
+
+
+@media (max-width: 768px) {
+    .acme-api-panel {
+        padding: 16px;
+        margin: 16px 0;
+        border-radius: 12px;
+    }
+
+    .acme-api-panel-header {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+        margin-bottom: 18px;
+    }
+
+    .acme-api-panel-header h2 {
+        font-size: 24px;
+        line-height: 1.15;
+        margin-bottom: 6px;
+    }
+
+    .acme-api-panel-subtitle {
+        font-size: 14px;
+        line-height: 1.4;
+    }
+
+    .acme-api-admin-badge {
+        align-self: flex-start;
+        font-size: 12px;
+        padding: 6px 10px;
+    }
+
+    .acme-api-card {
+        padding: 16px;
+        border-radius: 14px;
+        margin-bottom: 16px;
+    }
+
+    .acme-api-card h3 {
+        font-size: 18px;
+        margin-bottom: 10px;
+    }
+
+    .acme-api-status-row {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 14px;
+    }
+
+    .acme-api-status-text,
+    .acme-api-status-description {
+        font-size: 14px;
+        line-height: 1.45;
+    }
+
+    .acme-api-actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+    }
+
+    .acme-api-button {
+        width: 100%;
+        padding: 12px 14px;
+        font-size: 14px;
+        text-align: center;
+    }
+
+    .acme-api-grid {
+        display: block;
+        margin-bottom: 0;
+    }
+
+    .acme-api-summary-grid {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+
+    .acme-api-summary-card {
+        padding: 14px 16px;
+        border-radius: 12px;
+    }
+
+    .acme-api-summary-value {
+        font-size: 24px;
+    }
+
+    .acme-api-form-row {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+
+    .acme-api-field label {
+        font-size: 13px;
+    }
+
+    .acme-api-field input,
+    .acme-api-field select {
+        padding: 12px 14px;
+        font-size: 14px;
+        min-height: 44px;
+    }
+
+    .acme-api-service-list {
+        gap: 12px;
+        flex-direction: column;
+        align-items: flex-start;
+        margin-bottom: 18px;
+    }
+
+    .acme-api-service-item {
+        font-size: 14px;
+    }
+
+    .acme-api-notice {
+        padding: 14px;
+        font-size: 14px;
+        border-radius: 12px;
+    }
+
+    .acme-api-key-box {
+        padding: 12px;
+    }
+
+    .acme-api-key-box code {
+        font-size: 12px;
+    }
+
+    .acme-api-table-wrap {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        border-radius: 12px;
+    }
+
+    .acme-api-table {
+        min-width: 860px;
+    }
+
+    .acme-api-table th,
+    .acme-api-table td {
+        padding: 10px 8px;
+        font-size: 12px;
+        vertical-align: top;
+    }
+
+    .acme-api-table code {
+        white-space: nowrap;
+        font-size: 12px;
+    }
+
+    .acme-api-row-actions {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 6px;
+        min-width: 92px;
+    }
+
+    .acme-api-inline-form {
+        width: 100%;
+    }
+
+    .acme-api-link-button,
+    .acme-api-inline-form button {
+        width: 100%;
+        min-height: 36px;
+        font-size: 12px;
+        padding: 8px 10px;
+        border-radius: 10px;
+    }
+}
+
+@media (max-width: 480px) {
+    .acme-api-panel {
+        padding: 12px;
+    }
+
+    .acme-api-panel-header h2 {
+        font-size: 20px;
+    }
+
+    .acme-api-panel-subtitle {
+        font-size: 13px;
+    }
+
+    .acme-api-card {
+        padding: 14px;
+    }
+
+    .acme-api-card h3 {
+        font-size: 16px;
+    }
+
+    .acme-api-actions {
+        grid-template-columns: 1fr;
+    }
+
+    .acme-api-button {
+        font-size: 13px;
+        padding: 11px 12px;
+    }
+
+    .acme-api-summary-value {
+        font-size: 22px;
+    }
+
+    .acme-api-table {
+        min-width: 780px;
+    }
+
+    .acme-api-table th,
+    .acme-api-table td {
+        font-size: 11px;
+        padding: 8px 6px;
+    }
+
+    .acme-api-row-actions {
+        min-width: 84px;
+    }
+}
+
+/* ============================
+   Botões da coluna Ações
+============================ */
+
+.acme-api-row-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.acme-api-inline-form {
+    margin: 0;
+}
+
+.acme-api-inline-form button {
+    display: inline-block;
+    width: auto;
+    padding: 6px 10px;
+    font-size: 12px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    line-height: 1.2;
+    min-height: 32px;
+}
+
+/* cores */
+
+.acme-btn-warning {
+    background: #fbbf24;
+    color: #000;
+}
+
+.acme-btn-success {
+    background: #22c55e;
+    color: #fff;
+}
+
+.acme-btn-danger {
+    background: #ef4444;
+    color: #fff;
 }

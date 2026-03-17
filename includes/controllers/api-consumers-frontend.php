@@ -143,6 +143,64 @@ if (!function_exists('acme_api_control_panel_handle_post')) {
             acme_api_control_panel_store_notice('success', 'Chave criada com sucesso.');
             return;
         }
+
+        if ($panelAction === 'update_consumer_status') {
+            $consumerId = isset($_POST['consumer_id']) ? (int) wp_unslash($_POST['consumer_id']) : 0;
+            $targetStatus = isset($_POST['target_status'])
+                ? sanitize_key(wp_unslash($_POST['target_status']))
+                : '';
+
+            if ($consumerId <= 0) {
+                acme_api_control_panel_store_notice('error', 'Consumidor inválido.');
+                return;
+            }
+
+            if (!in_array($targetStatus, ['active', 'inactive', 'revoked'], true)) {
+                acme_api_control_panel_store_notice('error', 'Status de destino inválido.');
+                return;
+            }
+
+            if ($targetStatus === 'revoked') {
+                if (!function_exists('acme_api_consumer_revoke')) {
+                    acme_api_control_panel_store_notice('error', 'Função de revogação não disponível.');
+                    return;
+                }
+
+                $result = acme_api_consumer_revoke($consumerId);
+
+                if ($result !== true) {
+                    acme_api_control_panel_store_notice('error', 'Não foi possível revogar a chave.');
+                    return;
+                }
+            } else {
+                if (!function_exists('acme_api_consumer_update_status')) {
+                    acme_api_control_panel_store_notice('error', 'Função de atualização de status não disponível.');
+                    return;
+                }
+
+                $result = acme_api_consumer_update_status($consumerId, $targetStatus);
+
+                if (is_wp_error($result)) {
+                    acme_api_control_panel_store_notice('error', $result->get_error_message());
+                    return;
+                }
+            }
+
+            if ($targetStatus === 'active') {
+                acme_api_control_panel_store_notice('success', 'Chave reativada com sucesso.');
+                return;
+            }
+
+            if ($targetStatus === 'inactive') {
+                acme_api_control_panel_store_notice('success', 'Chave inativada com sucesso.');
+                return;
+            }
+
+            acme_api_control_panel_store_notice('success', 'Chave revogada com sucesso.');
+            return;
+        }
+
+        acme_api_control_panel_store_notice('error', 'Ação do painel não reconhecida.');
     }
 }
 

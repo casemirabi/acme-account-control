@@ -341,3 +341,140 @@ if (!function_exists('acme_validate_api_key')) {
     return $consumerRow;
   }
 }
+
+
+if (!function_exists('acme_api_consumer_update_status')) {
+  function acme_api_consumer_update_status(int $consumerId, string $status)
+  {
+    global $wpdb;
+
+    $allowedStatuses = ['active', 'inactive', 'revoked'];
+
+    if (!in_array($status, $allowedStatuses, true)) {
+      return new WP_Error('acme_invalid_status', 'Status inválido.');
+    }
+
+    $consumerId = (int) $consumerId;
+    if ($consumerId <= 0) {
+      return new WP_Error('acme_invalid_consumer_id', 'Consumidor inválido.');
+    }
+
+    acme_api_consumers_activate();
+
+    $updated = $wpdb->update(
+      acme_api_consumers_table(),
+      [
+        'status' => $status,
+        'updated_at' => current_time('mysql'),
+      ],
+      [
+        'id' => $consumerId,
+      ],
+      ['%s', '%s'],
+      ['%d']
+    );
+
+    if ($updated === false) {
+      return new WP_Error('acme_api_consumer_update_failed', 'Erro ao atualizar status.');
+    }
+
+    return true;
+  }
+}
+
+if (!function_exists('acme_api_consumer_bulk_update_status')) {
+  function acme_api_consumer_bulk_update_status(array $ids, string $status)
+  {
+    if (empty($ids)) {
+      return true;
+    }
+
+    foreach ($ids as $id) {
+      $consumerId = (int) $id;
+      if ($consumerId <= 0) {
+        continue;
+      }
+
+      $result = acme_api_consumer_update_status($consumerId, $status);
+      if (is_wp_error($result)) {
+        return $result;
+      }
+    }
+
+    return true;
+  }
+}
+
+
+/*
+* Liberando página da API
+*/
+
+if (!function_exists('acme_user_has_active_service')) {
+  function acme_user_has_active_service(int $wpUserId, string $serviceSlug): bool
+  {
+    global $wpdb;
+
+    if ($wpUserId <= 0) {
+      return false;
+    }
+
+    $tableName = acme_api_consumers_table();
+
+    $rows = $wpdb->get_results(
+      $wpdb->prepare(
+        "SELECT * FROM {$tableName}
+         WHERE wp_user_id = %d
+         AND status = 'active'
+         LIMIT 1
+         "
+         ,
+        $wpUserId
+      ),
+      ARRAY_A
+    );
+
+    if (empty($rows)) {
+      return false;
+    }
+
+    foreach ($rows as $row) {
+      if (acme_api_consumer_allows_service($row, $serviceSlug)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+}
+
+add_action('template_redirect', function () {
+
+  if (!is_page('api-clt')) {
+    return;
+  }
+
+  // Admin sempre pode acessar
+  if (current_user_can('manage_options')) {
+    return;
+  }
+
+  // 🔒 NOVA REGRA: API global bloqueada
+  if (function_exists('acme_api_public_is_enabled') && !acme_api_public_is_enabled()) {
+    wp_safe_redirect(home_url('/api-indisponivel/'));
+    exit;
+  }
+
+  if (!is_user_logged_in()) {
+    wp_safe_redirect(wp_login_url());
+    exit;
+  }
+
+  $userId = get_current_user_id();
+
+  if (!acme_user_has_active_service($userId, 'clt')) {
+    wp_safe_redirect(home_url('/sem-permissao/'));
+    exit;
+  }
+
+});
