@@ -1919,9 +1919,8 @@ add_shortcode('acme_recover_credits_form', function () {
   }
 
   $me = wp_get_current_user();
-  $is_child = in_array('child', (array) $me->roles, strict: true);
+  $is_child = in_array('child', (array) $me->roles, true);
   $is_admin = current_user_can('manage_options');
-
 
   if (!$is_child && !$is_admin) {
     return '<p>Sem permissão.</p>';
@@ -1936,105 +1935,125 @@ add_shortcode('acme_recover_credits_form', function () {
 
   $grand_ids = (array) $wpdb->get_col($wpdb->prepare(
     "SELECT child_user_id FROM {$linksT} WHERE parent_user_id=%d AND depth=2",
-    (int)$me->ID
+    (int) $me->ID
   ));
 
   $grand_ids = array_values(array_unique(array_map('intval', $grand_ids)));
-  $grand_users = !empty($grand_ids) ? get_users(['include' => $grand_ids, 'orderby' => 'display_name', 'order' => 'ASC', 'number' => 500]) : [];
-
-  $is_admin = current_user_can('manage_options');
+  $grand_users = !empty($grand_ids)
+    ? get_users([
+        'include' => $grand_ids,
+        'orderby' => 'display_name',
+        'order'   => 'ASC',
+        'number'  => 500
+      ])
+    : [];
 
   if ($is_admin) {
-    // Admin: lista apenas Masters (pais que têm vínculos depth=2)
     $master_ids = (array) $wpdb->get_col(
       "SELECT DISTINCT child_user_id
-     FROM {$linksT}
-     WHERE depth=1 "
+       FROM {$linksT}
+       WHERE depth = 1"
     );
 
     $master_ids = array_values(array_unique(array_map('intval', $master_ids)));
 
     $grand_users = !empty($master_ids)
       ? get_users([
-        'include' => $master_ids,
-        'orderby' => 'display_name',
-        'order'   => 'ASC',
-        'number'  => 500,
-      ])
+          'include' => $master_ids,
+          'orderby' => 'display_name',
+          'order'   => 'ASC',
+          'number'  => 500,
+        ])
       : [];
   }
 
+  $title = 'Recuperação de créditos';
+  $subtitle = $is_admin
+    ? 'Recupere créditos de Masters conforme o escopo permitido.'
+    : 'Recupere créditos do Usuário.';
+  $btn = 'Recuperar créditos';
 
+  ob_start();
 
-  ob_start(); ?>
-  <div style="max-width:auto;background:#fff;border:1px solid #ddd;padding:16px;border-radius:10px">
-    <h3 style="margin-top:0">Recuperação de Créditos</h3>
+  if (function_exists('acme_ui_panel_css')) {
+    echo acme_ui_panel_css();
+  }
+  ?>
 
-    <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
-      <input type="hidden" name="action" value="acme_recover_credits">
-      <?php wp_nonce_field('acme_recover_credits'); ?>
+  <div class="acme-panel">
 
+    <div class="acme-panel-h">
+      <div>
+        <div class="acme-panel-title"><?php echo esc_html($title); ?></div>
+        <div class="acme-panel-sub"><?php echo esc_html($subtitle); ?></div>
+      </div>
 
-      <?php if ($is_admin): ?>
+      <a class="acme-btn" href="<?php echo esc_url(remove_query_arg(['acme_msg', 'acme_err'])); ?>">
+        Atualizar
+      </a>
+    </div>
 
-        <!--============================-->
+    <div style="padding:14px 16px;">
 
-        <p>
-          <label><strong>Master</strong></label><br>
-          <select name="user_id" required style="min-width:360px">
+      <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="display:grid;gap:12px;">
+        <input type="hidden" name="action" value="acme_recover_credits">
+        <?php wp_nonce_field('acme_recover_credits'); ?>
+
+        <div>
+          <label style="display:block;font-size:12px;margin-bottom:6px;color:#64748b;font-weight:900;">
+            <?php echo $is_admin ? 'Master' : 'Usuário'; ?>
+          </label>
+          <select name="user_id" required class="acme-inp">
             <option value="">Selecione...</option>
-            <?php foreach ((array)$grand_users as $u): ?>
-              <option value="<?php echo (int)$u->ID; ?>">
-                <?php echo esc_html($u->display_name . ' (#' . $u->ID . ')'); ?>
+            <?php foreach ((array) $grand_users as $u): ?>
+              <option value="<?php echo (int) $u->ID; ?>">
+                <?php echo esc_html($u->display_name . ' (#' . (int) $u->ID . ')'); ?>
               </option>
             <?php endforeach; ?>
           </select>
-        </p>
+        </div>
 
-      <?php else: ?>
-
-        <!--============================-->
-        <p>
-          <label><strong>Sub-Login</strong></label><br>
-          <select name="user_id" required style="min-width:360px">
+        <div>
+          <label style="display:block;font-size:12px;margin-bottom:6px;color:#64748b;font-weight:900;">
+            Serviço
+          </label>
+          <select name="service_slug" required class="acme-inp">
             <option value="">Selecione...</option>
-            <?php foreach ((array)$grand_users as $u): ?>
-              <option value="<?php echo (int)$u->ID; ?>">
-                <?php echo esc_html($u->display_name . ' (#' . $u->ID . ')'); ?>
+            <?php foreach ((array) $services as $s): ?>
+              <option value="<?php echo esc_attr($s->slug); ?>">
+                <?php echo esc_html($s->name . ' (' . (int) $s->credits_cost . ' crédito(s) por uso)'); ?>
               </option>
             <?php endforeach; ?>
           </select>
-        </p>
+        </div>
 
-      <?php endif; ?>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:end;">
+          <div style="flex:1;min-width:160px;">
+            <label style="display:block;font-size:12px;margin-bottom:6px;color:#64748b;font-weight:900;">
+              Quantidade
+            </label>
+            <input type="number" name="credits" min="1" step="1" value="1" required class="acme-inp">
+          </div>
+        </div>
 
-      <p>
-        <label><strong>Serviço</strong></label><br>
-        <select name="service_slug" required style="min-width:360px">
-          <option value="">Selecione...</option>
-          <?php foreach ((array)$services as $s): ?>
-            <option value="<?php echo esc_attr($s->slug); ?>">
-              <?php echo esc_html($s->name . ' (' . (int)$s->credits_cost . ' crédito(s) por uso)'); ?>
-            </option>
-          <?php endforeach; ?>
-        </select>
-      </p>
+        <div>
+          <label style="display:block;font-size:12px;margin-bottom:6px;color:#64748b;font-weight:900;">
+            Observação (opcional)
+          </label>
+          <input type="text" name="notes" class="acme-inp" placeholder="Ex: ajuste de limite">
+        </div>
 
-      <p>
-        <label><strong>Quantidade</strong></label><br>
-        <input type="number" name="credits" min="1" step="1" value="1" required style="width:120px">
-      </p>
+        <button
+          type="submit"
+          class="acme-btn"
+          style="padding:12px 14px;background:#111827;border-color:#111827;color:#fff;font-size:15px;">
+          <?php echo esc_html($btn); ?>
+        </button>
+      </form>
 
-      <p>
-        <label><strong>Observação (opcional)</strong></label><br>
-        <input type="text" name="notes" style="min-width:360px" placeholder="Ex: ajuste de limite">
-      </p>
-
-      <p>
-        <button type="submit">Recuperar créditos</button>
-      </p>
-    </form>
+    </div>
   </div>
+
   <?php
   return ob_get_clean();
 });
@@ -2294,4 +2313,287 @@ if (!function_exists('acme_enqueue_my_profile_page_assets')) {
   {
     wp_enqueue_style('acme-my-profile-page');
   }
+}
+
+
+add_shortcode('acme_grant_credits', 'acme_shortcode_grant_credits');
+
+function acme_shortcode_grant_credits()
+{
+    if (!is_user_logged_in()) {
+        return '<p>Você precisa estar logado.</p>';
+    }
+
+    $me = wp_get_current_user();
+    $is_admin = current_user_can('manage_options');
+    $is_child = function_exists('acme_user_has_role')
+        ? acme_user_has_role($me, 'child')
+        : in_array('child', (array) $me->roles, true);
+
+    if (!$is_admin && !$is_child) {
+        return '<p>Sem permissão.</p>';
+    }
+
+    global $wpdb;
+    $servicesT = acme_table_services();
+    $services = $wpdb->get_results("SELECT slug, name, credits_cost FROM {$servicesT} ORDER BY name ASC");
+
+    $users = [];
+    $masterUsers = [];
+    $subLoginUsers = [];
+
+    if ($is_admin) {
+        $masterUsers = get_users([
+            'role'    => 'child',
+            'orderby' => 'display_name',
+            'order'   => 'ASC',
+            'number'  => 500,
+        ]);
+
+        $subLoginUsers = get_users([
+            'role'    => 'grandchild',
+            'orderby' => 'display_name',
+            'order'   => 'ASC',
+            'number'  => 500,
+        ]);
+    } else {
+        $ids = acme_get_grandchildren_of_child((int) $me->ID);
+        $users = $ids ? get_users([
+            'include' => array_map('intval', $ids),
+            'orderby' => 'display_name',
+            'order'   => 'ASC',
+            'number'  => 500,
+        ]) : [];
+    }
+
+    $msg = isset($_GET['acme_msg']) ? sanitize_text_field($_GET['acme_msg']) : '';
+    $err = isset($_GET['acme_err']) ? sanitize_text_field(wp_unslash($_GET['acme_err'])) : '';
+
+
+
+    $isEditContext = isset($_GET['user_id']) && (int) $_GET['user_id'] > 0;
+
+    if ($isEditContext) {
+        $title = 'Créditos / concessão';
+        $subtitle = 'Gerencie créditos do usuário conforme o escopo permitido.';
+        $btn = $is_admin ? 'Conceder créditos' : 'Distribuir créditos';
+    } else {
+        $title = $is_admin ? 'Conceder créditos' : 'Distribuir créditos para Usuário';
+        $subtitle = $is_admin ? 'Conceda créditos para Master ou Sub-Login.' : 'Distribua créditos para Usuário.';
+        $btn = $is_admin ? 'Conceder créditos' : 'Distribuir créditos';
+    }
+
+
+    $qty_label = 'Quantidade';
+
+    $target_id = 0;
+    $target_name = '';
+
+    if (isset($_GET['user_id'])) {
+        $target_id = (int) $_GET['user_id'];
+        if ($target_id > 0) {
+            $target_user = get_user_by('id', $target_id);
+            $target_name = $target_user ? $target_user->display_name : ('#' . $target_id);
+        }
+    }
+
+    ob_start();
+
+    if (function_exists('acme_ui_panel_css')) {
+        echo acme_ui_panel_css();
+    }
+?>
+
+    <div class="acme-panel">
+
+        <div class="acme-panel-h">
+            <div>
+                <div class="acme-panel-title"><?php echo esc_html($title); ?></div>
+                <div class="acme-panel-sub"><?php echo esc_html($subtitle); ?></div>
+            </div>
+
+            <a class="acme-btn" href="<?php echo esc_url(remove_query_arg(['acme_msg', 'acme_err'])); ?>">Atualizar</a>
+        </div>
+
+        <div style="padding:14px 16px;">
+
+            <?php if ($msg === 'ok'): ?>
+                <div style="padding:10px 12px;border-radius:12px;background:#ecfdf5;border:1px solid #a7f3d0;color:#065f46;font-weight:900;margin-bottom:12px;">
+                    Ação realizada com sucesso.
+                </div>
+            <?php elseif ($msg === 'err'): ?>
+                <div style="padding:10px 12px;border-radius:12px;background:#fef2f2;border:1px solid #fecaca;color:#991b1b;font-weight:900;margin-bottom:12px;">
+                    Erro ao <?php echo $is_admin ? 'conceder créditos' : 'distribuir créditos'; ?>.
+                    <?php if ($err): ?>
+                        <div style="margin-top:6px;font-weight:700;opacity:.95"><?php echo esc_html($err); ?></div>
+                    <?php endif; ?>
+                </div>
+            <?php endif; ?>
+
+            <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="display:grid;gap:12px;" id="acme-grant-credits-form">
+                <input type="hidden" name="action" value="acme_admin_grant_credits">
+                <?php wp_nonce_field('acme_admin_grant_credits'); ?>
+
+                <?php if ($is_admin): ?>
+                    <div>
+                        <label style="display:block;font-size:12px;margin-bottom:6px;color:#64748b;font-weight:900;">Tipo</label>
+                        <select name="grant_type" required class="acme-inp">
+                            <option value="subscription">Assinatura (com vencimento)</option>
+                            <option value="full">Full (sem vencimento)</option>
+                        </select>
+                    </div>
+                <?php else: ?>
+                    <input type="hidden" name="grant_type" value="transfer">
+                <?php endif; ?>
+
+                <?php if ($target_id > 0): ?>
+                    <div>
+                        <label style="display:block;font-size:12px;margin-bottom:6px;color:#64748b;font-weight:900;">Usuário</label>
+                        <select name="user_id" required class="acme-inp">
+                            <option value="<?php echo (int) $target_id; ?>">
+                                <?php echo esc_html($target_name); ?>
+                            </option>
+                        </select>
+                    </div>
+                <?php elseif ($is_admin): ?>
+                    <input type="hidden" name="user_id" id="acme_target_user_id" value="">
+
+                    <div style="display:grid;gap:12px;">
+                        <div>
+                            <label style="display:block;font-size:12px;margin-bottom:6px;color:#64748b;font-weight:900;">Master</label>
+                            <select name="master_user_id" id="acme_master_user_id" class="acme-inp">
+                                <option value="">Selecione um Master...</option>
+                                <?php foreach ($masterUsers as $u): ?>
+                                    <option value="<?php echo (int) $u->ID; ?>">
+                                        <?php echo esc_html($u->display_name . ' (#' . $u->ID . ') - ' . $u->user_email); ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label style="display:block;font-size:12px;margin-bottom:6px;color:#64748b;font-weight:900;">Sub-Login</label>
+                            <select name="sub_user_id" id="acme_sub_user_id" class="acme-inp">
+                                <option value="">Selecione um Sub-Login...</option>
+                                <?php foreach ($subLoginUsers as $u): ?>
+                                    <option value="<?php echo (int) $u->ID; ?>">
+                                        <?php echo esc_html($u->display_name . ' (#' . $u->ID . ') - ' . $u->user_email); ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+
+                        <div style="font-size:12px;color:#64748b;font-weight:700;">
+                            Preencha apenas um dos campos: Master ou Sub-Login.
+                        </div>
+                    </div>
+                <?php else: ?>
+                    <div>
+                        <label style="display:block;font-size:12px;margin-bottom:6px;color:#64748b;font-weight:900;">Usuário</label>
+                        <select name="user_id" required class="acme-inp">
+                            <option value="">Selecione...</option>
+                            <?php foreach ($users as $u): ?>
+                                <option value="<?php echo (int) $u->ID; ?>">
+                                    <?php echo esc_html($u->display_name . ' (#' . $u->ID . ') - ' . $u->user_email); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                <?php endif; ?>
+
+                <div>
+                    <label style="display:block;font-size:12px;margin-bottom:6px;color:#64748b;font-weight:900;">Serviço</label>
+                    <select name="service_slug" required class="acme-inp">
+                        <option value="">Selecione...</option>
+                        <?php foreach ((array) $services as $s): ?>
+                            <option value="<?php echo esc_attr($s->slug); ?>">
+                                <?php echo esc_html($s->name . ' (' . (int) $s->credits_cost . ' crédito(s)/uso)'); ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+
+                <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:end;">
+                    <div style="flex:1;min-width:160px;">
+                        <label style="display:block;font-size:12px;margin-bottom:6px;color:#64748b;font-weight:900;">
+                            <?php echo esc_html($qty_label); ?>
+                        </label>
+                        <input type="number" name="credits" min="1" step="1" required value="1" class="acme-inp">
+                    </div>
+
+                    <?php if ($is_admin): ?>
+                        <div style="flex:1;min-width:220px;">
+                            <label style="display:block;font-size:12px;margin-bottom:6px;color:#64748b;font-weight:900;">
+                                Expiração (quando Assinatura)
+                            </label>
+                            <input type="date" name="expires_at" class="acme-inp">
+                        </div>
+                    <?php endif; ?>
+                </div>
+
+                <div>
+                    <label style="display:block;font-size:12px;margin-bottom:6px;color:#64748b;font-weight:900;">Observação (opcional)</label>
+                    <input type="text" name="notes" placeholder="Ex: pacote mensal" class="acme-inp">
+                </div>
+
+                <button type="submit" class="acme-btn" style="padding:12px 14px;background:#111827;border-color:#111827;color:#fff;font-size:15px;">
+                    <?php echo esc_html($btn); ?>
+                </button>
+            </form>
+
+            <?php if ($is_admin && $target_id <= 0): ?>
+                <script>
+                    (function() {
+                        var form = document.getElementById('acme-grant-credits-form');
+                        if (!form) return;
+
+                        var masterSelect = document.getElementById('acme_master_user_id');
+                        var subSelect = document.getElementById('acme_sub_user_id');
+                        var hiddenUserId = document.getElementById('acme_target_user_id');
+
+                        if (!masterSelect || !subSelect || !hiddenUserId) return;
+
+                        function syncFields(changedField) {
+                            if (changedField === 'master' && masterSelect.value) {
+                                subSelect.value = '';
+                            }
+
+                            if (changedField === 'sub' && subSelect.value) {
+                                masterSelect.value = '';
+                            }
+
+                            hiddenUserId.value = masterSelect.value || subSelect.value || '';
+                        }
+
+                        masterSelect.addEventListener('change', function() {
+                            syncFields('master');
+                        });
+
+                        subSelect.addEventListener('change', function() {
+                            syncFields('sub');
+                        });
+
+                        form.addEventListener('submit', function(event) {
+                            syncFields();
+
+                            if (!hiddenUserId.value) {
+                                event.preventDefault();
+                                alert('Selecione um Master ou um Sub-Login.');
+                                return;
+                            }
+
+                            if (masterSelect.value && subSelect.value) {
+                                event.preventDefault();
+                                alert('Selecione apenas um destino: Master ou Sub-Login.');
+                            }
+                        });
+                    })();
+                </script>
+            <?php endif; ?>
+
+        </div>
+    </div>
+
+    <?php
+    return ob_get_clean();
 }
