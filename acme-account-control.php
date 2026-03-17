@@ -100,6 +100,7 @@ acme_safe_require(ACME_ACC_PATH . 'includes/support/helpers.php', true);
 acme_safe_require(ACME_ACC_PATH . 'includes/support/api-consumers.php', false);
 acme_safe_require(ACME_ACC_PATH . 'includes/models/users-module.php', true);
 acme_safe_require(ACME_ACC_PATH . 'includes/services/services-module.php', true);
+acme_safe_require(ACME_ACC_PATH . 'includes/services/users-status-service.php', true);
 
 acme_safe_require(__DIR__ . '/includes/services/credits-engine.php', true);
 acme_safe_require(__DIR__ . '/includes/services/credits-module.php', true);
