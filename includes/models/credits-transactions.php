@@ -626,6 +626,13 @@ if (!function_exists('acme_render_transactions_table')) {
         <div class="acme-actions">
           <a class="acme-btn" href="<?php echo esc_url(add_query_arg([], get_permalink())); ?>">Atualizar</a>
           <a class="acme-btn" href="<?php echo esc_url($xls_url); ?>" title="Baixar Excel">⬇ Baixar Relatório</a>
+
+          <?php if ($has_any_filter): ?>
+            <a class="acme-btn" href="<?php echo esc_url(remove_query_arg(['q', 'type', 'status', 'user_id', 'service_id', 'from', 'to', 'paged'])); ?>">
+              Limpar filtros
+            </a>
+          <?php endif; ?>
+
           <button type="submit"
             form="acme-tx-filter-form"
             class="acme-btn-icon"
@@ -637,11 +644,6 @@ if (!function_exists('acme_render_transactions_table')) {
           </button>
 
 
-          <?php if ($has_any_filter): ?>
-            <a class="acme-btn" href="<?php echo esc_url(remove_query_arg(['q', 'type', 'status', 'user_id', 'service_id', 'from', 'to', 'paged'])); ?>">
-              Limpar filtros
-            </a>
-          <?php endif; ?>
         </div>
       </div>
 

@@ -1528,6 +1528,9 @@ add_shortcode('acme_my_grandchildren_manage', function ($atts) {
             <div class="acme-actions">
                 <a class="acme-btn" href="<?php echo esc_url($baseUrl); ?>">Atualizar</a>
 
+
+                <?php echo do_shortcode('[acme_export_button report="users" label="Baixar usuários" class="acme-btn"]'); ?>
+
                 <?php if ($hasAnyFilter): ?>
                     <a class="acme-btn" style="background:#fff;color:#0f172a;border:1px solid #e2e8f0;"
                         href="<?php echo esc_url(remove_query_arg(['q', 'master', 'status', 'credits', 'acme_msg'])); ?>">
@@ -1535,7 +1538,7 @@ add_shortcode('acme_my_grandchildren_manage', function ($atts) {
                     </a>
                 <?php endif; ?>
 
-                <?php echo do_shortcode('[acme_export_button report="users" label="Baixar usuários" class="acme-btn"]'); ?>
+
                 <button type="submit"
                     form="acme-users-filter-form"
                     class="acme-btn-icon"
@@ -1545,6 +1548,8 @@ add_shortcode('acme_my_grandchildren_manage', function ($atts) {
                         <path d="M16.5 16.5 21 21" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
                     </svg>
                 </button>
+
+
             </div>
         </div>
 
