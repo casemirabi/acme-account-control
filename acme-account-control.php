@@ -99,6 +99,31 @@ if (file_exists($acme_autoload)) {
 acme_safe_require(ACME_ACC_PATH . 'includes/support/helpers.php', true);
 acme_safe_require(ACME_ACC_PATH . 'includes/support/api-consumers.php', false);
 acme_safe_require(ACME_ACC_PATH . 'includes/models/users-module.php', true);
+
+
+
+/*
+* Novos arquivos 18032026
+*/
+require_once ACME_ACC_PATH . 'includes/controllers/user-credits-shortcode-controller.php';
+require_once ACME_ACC_PATH . 'includes/controllers/user-edit-page-controller.php';
+require_once ACME_ACC_PATH . 'includes/controllers/user-manage-controller.php';
+require_once ACME_ACC_PATH . 'includes/controllers/user-grandchildren-controller.php';
+require_once ACME_ACC_PATH . 'includes/controllers/user-add-controller.php';
+require_once ACME_ACC_PATH . 'includes/controllers/user-view-controller.php';
+require_once ACME_ACC_PATH . 'includes/controllers/user-view-fixed-controller.php';
+require_once ACME_ACC_PATH . 'includes/controllers/user-view-atual-controller.php';
+require_once ACME_ACC_PATH . 'includes/controllers/user-edit-controller.php';
+require_once ACME_ACC_PATH . 'includes/controllers/user-actions-controller.php';
+
+
+require_once ACME_ACC_PATH . '/includes/services/users-service.php';
+require_once ACME_ACC_PATH . '/includes/services/users-manage-service.php';
+
+
+
+
+
 acme_safe_require(ACME_ACC_PATH . 'includes/services/services-module.php', true);
 acme_safe_require(ACME_ACC_PATH . 'includes/services/users-status-service.php', true);
 
@@ -135,7 +160,6 @@ acme_safe_require(ACME_ACC_PATH . 'includes/controllers/pbank-async.php', false)
 
 acme_safe_require(__DIR__ . '/includes/services/reports-export.php', false);
 acme_safe_require(__DIR__ . '/includes/support/reports.php', false);
-
 
 
 

@@ -1,9 +1,6 @@
 <?php
 if (!defined('ABSPATH'))
     exit;
-
-add_action('admin_post_acme_fe_toggle_status', 'acme_fe_toggle_status');
-
 /**
  * ============================================================
  * MÓDULO: Usuários (hierarquia + cascata + front-end)
@@ -351,67 +348,6 @@ add_action('init', function () {
 });
 
 
-/**
- * ============================================================
- * HELPERS — Regras de Status (Master/Sub-login)
- * ============================================================
- * Objetivo:
- * - Ler status de um usuário na tabela wp_account_status (ou active por padrão)
- * - Descobrir o Master de um Sub-Login via wp_account_links (depth=2)
- */
-
-/**
- * Retorna TRUE se o usuário estiver ativo.
- * Regra de compatibilidade:
- * - Se não existir linha na tabela status, considera "active" (padrão do sistema).
- */
-if (!function_exists('acme_account_is_active')) {
-    function acme_account_is_active(int $user_id): bool
-    {
-        global $wpdb;
-        $statusT = acme_table_status();
-
-        $st = $wpdb->get_var($wpdb->prepare(
-            "SELECT status
-         FROM {$statusT}
-        WHERE user_id=%d
-        LIMIT 1",
-            $user_id
-        ));
-
-        // Se não tiver linha no status, consideramos ativo (mesma lógica do COALESCE em consultas)
-        if (!$st)
-            return true;
-
-        return $st === 'active';
-    }
-}
-
-/**
- * Retorna o ID do Master (child) vinculado a um Sub-Login (grandchild).
- * - Usa account_links depth=2: parent_user_id = master, child_user_id = sub-login
- * - Se não encontrar vínculo, retorna 0.
- */
-if (!function_exists('acme_get_master_id_of_grandchild')) {
-    function acme_get_master_id_of_grandchild(int $grandchild_id): int
-    {
-        global $wpdb;
-        $linksT = acme_table_links();
-
-        $mid = $wpdb->get_var($wpdb->prepare(
-            "SELECT parent_user_id
-         FROM {$linksT}
-        WHERE child_user_id=%d
-          AND depth=2
-        LIMIT 1",
-            $grandchild_id
-        ));
-
-        return (int) ($mid ?: 0);
-    }
-}
-
-
 
 /**
  * ============================================================
@@ -464,46 +400,7 @@ function acme_handle_deactivate()
 }
 
 // Cascata: inativa alvo; se alvo for FILHO, inativa netos dele
-function acme_deactivate_tree($user_id)
-{
-    $targetUserId = (int) $user_id;
 
-    // Admin master nunca inativo
-    if ($targetUserId === (int) acme_master_admin_id()) {
-        return;
-    }
-
-    if (!function_exists('acme_users_set_status')) {
-        return;
-    }
-
-    $disabledAt = current_time('mysql');
-
-    $targetUser = get_user_by('id', $targetUserId);
-    $isChild = $targetUser && acme_user_has_role($targetUser, 'child');
-
-    // ✅ inativa alvo
-    acme_users_set_status(
-        $targetUserId,
-        'inactive',
-        null,          // disabled_by (não existia antes)
-        null,          // reason (não existia antes)
-        $disabledAt,
-        [
-            'mode' => 'replace',
-        ]
-    );
-
-    // ✅ cascata se for child
-    if ($isChild && function_exists('acme_users_deactivate_children_cascade')) {
-
-        acme_users_deactivate_children_cascade(
-            $targetUserId,
-            0,                  // disabled_by
-            'Cascata (tree)'    // reason
-        );
-    }
-}
 
 // Coluna Status no admin
 add_filter('manage_users_columns', function ($cols) {
@@ -618,7 +515,7 @@ function acme_handle_activate()
  * ============================================================
  */
 
-add_shortcode('acme_my_grandchildren', function ($atts) {
+function acme_shortcode_my_grandchildren($atts) {
 
     if (!is_user_logged_in())
         return '<p>Você precisa estar logado.</p>';
@@ -649,18 +546,7 @@ add_shortcode('acme_my_grandchildren', function ($atts) {
             ORDER BY u.display_name ASC
         ");
     } else {
-        /*$rows = $wpdb->get_results($wpdb->prepare("
-            SELECT u.ID, u.display_name, u.user_email,
-                   COALESCE(s.status,'active') AS status,
-                   s.disabled_at
-            FROM {$links} l
-            INNER JOIN {$usersT} u ON u.ID = l.child_user_id
-            LEFT JOIN {$status} s ON s.user_id = u.ID
-            WHERE l.parent_user_id = %d AND l.depth = 2
-            ORDER BY u.display_name ASC
-        ", $uid));
 
-    }*/
         $rows = $wpdb->get_results($wpdb->prepare("
         SELECT 
             u.ID,
@@ -719,7 +605,7 @@ add_shortcode('acme_my_grandchildren', function ($atts) {
     </div>
 <?php
     return ob_get_clean();
-});
+};
 
 /**
  * ============================================================
@@ -786,7 +672,6 @@ function acme_fe_toggle_status()
     exit;
 }
 
-add_action('admin_post_acme_fe_bulk_activate', 'acme_fe_bulk_activate');
 
 function acme_fe_bulk_activate()
 {
@@ -909,7 +794,6 @@ function acme_fe_bulk_activate()
     exit;
 }
 
-add_action('admin_post_acme_fe_bulk_deactivate', 'acme_fe_bulk_deactivate');
 
 function acme_fe_bulk_deactivate()
 {
@@ -1049,7 +933,6 @@ function acme_fe_bulk_deactivate()
 
 
 
-add_action('admin_post_acme_fe_set_password', 'acme_fe_set_password');
 function acme_fe_set_password()
 {
 
@@ -1109,7 +992,6 @@ function acme_fe_set_password()
     exit;
 }
 
-add_action('admin_post_acme_fe_update_phone', 'acme_fe_update_phone');
 function acme_fe_update_phone()
 {
 
@@ -1160,294 +1042,6 @@ function acme_fe_update_phone()
     exit;
 }
 
-
-/**
- * Preparação para acme_my_grandchildren_manage
- */
-if (!function_exists('acme_users_manage_get_filters')) {
-    function acme_users_manage_get_filters(bool $isAdmin): array
-    {
-        $query = isset($_GET['q']) ? trim((string) $_GET['q']) : '';
-        $queryNormalized = mb_strtolower($query);
-
-        $filterMaster = isset($_GET['master']) ? (int) $_GET['master'] : 0;
-        $filterStatus = isset($_GET['status']) ? sanitize_text_field((string) $_GET['status']) : 'all';
-        $filterCredits = isset($_GET['credits']) ? sanitize_text_field((string) $_GET['credits']) : 'all';
-
-        if (!$isAdmin) {
-            $filterMaster = 0;
-        }
-
-        if (!in_array($filterStatus, ['all', 'active', 'inactive'], true)) {
-            $filterStatus = 'all';
-        }
-
-        if (!in_array($filterCredits, ['all', 'has', 'none'], true)) {
-            $filterCredits = 'all';
-        }
-
-        return [
-            'q'               => $query,
-            'q_norm'          => $queryNormalized,
-            'filter_master'   => $filterMaster,
-            'filter_status'   => $filterStatus,
-            'filter_credits'  => $filterCredits,
-        ];
-    }
-}
-#===================================
-if (!function_exists('acme_users_manage_get_actor_credit_summary')) {
-    function acme_users_manage_get_actor_credit_summary(int $userId): array
-    {
-        global $wpdb;
-
-        $lotsTable = function_exists('acme_table_credit_lots')
-            ? acme_table_credit_lots()
-            : ($wpdb->prefix . 'credit_lots');
-
-        $servicesTable = function_exists('acme_table_services')
-            ? acme_table_services()
-            : ($wpdb->prefix . 'services');
-
-        $nowMysql = current_time('mysql');
-
-        $lotRows = $wpdb->get_results($wpdb->prepare(
-            "SELECT l.service_id,
-                    l.credits_total, l.credits_used, l.expires_at,
-                    s.slug, s.name
-             FROM {$lotsTable} l
-             LEFT JOIN {$servicesTable} s ON s.id = l.service_id
-             WHERE l.owner_user_id = %d
-               AND (l.expires_at IS NULL OR l.expires_at >= %s)
-             ORDER BY s.name ASC, l.id ASC",
-            $userId,
-            $nowMysql
-        ));
-
-        $creditTotalAvailable = 0;
-        $creditBreakdown = [];
-
-        foreach ((array) $lotRows as $row) {
-            $available = max(0, (int) $row->credits_total - (int) $row->credits_used);
-            $creditTotalAvailable += $available;
-
-            $serviceId = (int) $row->service_id;
-
-            if (!isset($creditBreakdown[$serviceId])) {
-                $creditBreakdown[$serviceId] = [
-                    'service'     => $row->name ?: ('Serviço #' . $serviceId),
-                    'avail'       => 0,
-                    'nearest_exp' => null,
-                ];
-            }
-
-            $creditBreakdown[$serviceId]['avail'] += $available;
-
-            if (!empty($row->expires_at)) {
-                $expiresTs = strtotime($row->expires_at);
-                $currentNearestTs = !empty($creditBreakdown[$serviceId]['nearest_exp'])
-                    ? strtotime($creditBreakdown[$serviceId]['nearest_exp'])
-                    : null;
-
-                if (!$currentNearestTs || ($expiresTs && $expiresTs < $currentNearestTs)) {
-                    $creditBreakdown[$serviceId]['nearest_exp'] = $row->expires_at;
-                }
-            }
-        }
-
-        return [
-            'credit_total_available' => $creditTotalAvailable,
-            'credit_breakdown'       => array_values($creditBreakdown),
-        ];
-    }
-}
-#===================================
-if (!function_exists('acme_users_manage_get_base_rows')) {
-    function acme_users_manage_get_base_rows(int $actorUserId, bool $isAdmin): array
-    {
-        global $wpdb;
-
-        $linksTable = acme_table_links();
-        $statusTable = acme_table_status();
-        $usersTable = $wpdb->users;
-
-        if ($isAdmin) {
-            $grandRows = $wpdb->get_results(
-                "SELECT u.ID, u.display_name, u.user_email,
-                        l.parent_user_id AS master_id,
-                        COALESCE(s.status, 'active') AS status,
-                        s.disabled_at
-                 FROM {$linksTable} l
-                 INNER JOIN {$usersTable} u ON u.ID = l.child_user_id
-                 LEFT JOIN {$statusTable} s ON s.user_id = u.ID
-                 WHERE l.depth = 2
-                 ORDER BY u.display_name ASC"
-            );
-        } else {
-            $grandRows = $wpdb->get_results($wpdb->prepare(
-                "SELECT u.ID, u.display_name, u.user_email,
-                        l.parent_user_id AS master_id,
-                        COALESCE(s.status, 'active') AS status,
-                        s.disabled_at
-                 FROM {$linksTable} l
-                 INNER JOIN {$usersTable} u ON u.ID = l.child_user_id
-                 LEFT JOIN {$statusTable} s ON s.user_id = u.ID
-                 WHERE l.depth = 2
-                   AND l.parent_user_id = %d
-                 ORDER BY u.display_name ASC",
-                $actorUserId
-            ));
-        }
-
-        $rows = [];
-
-        foreach ((array) $grandRows as $row) {
-            $row->phone = get_user_meta($row->ID, 'phone', true);
-            $row->acme_type = acme_role_label('grandchild');
-            $rows[] = $row;
-        }
-
-        if ($isAdmin) {
-            $childrenUsers = get_users(['role' => 'child']);
-
-            foreach ((array) $childrenUsers as $childUser) {
-                $childRow = (object) [
-                    'ID'           => $childUser->ID,
-                    'display_name' => $childUser->display_name,
-                    'user_email'   => $childUser->user_email,
-                    'master_id'    => (int) $childUser->ID,
-                    'status'       => 'active',
-                    'disabled_at'  => null,
-                    'phone'        => get_user_meta($childUser->ID, 'phone', true),
-                    'acme_type'    => acme_role_label('child'),
-                ];
-
-                $statusValue = $wpdb->get_var($wpdb->prepare(
-                    "SELECT status FROM {$statusTable} WHERE user_id = %d",
-                    $childUser->ID
-                ));
-
-                if ($statusValue) {
-                    $childRow->status = $statusValue;
-                }
-
-                $disabledAtValue = $wpdb->get_var($wpdb->prepare(
-                    "SELECT disabled_at FROM {$statusTable} WHERE user_id = %d",
-                    $childUser->ID
-                ));
-
-                if ($disabledAtValue) {
-                    $childRow->disabled_at = $disabledAtValue;
-                }
-
-                $rows[] = $childRow;
-            }
-        }
-
-        return $rows;
-    }
-}
-#===================================
-if (!function_exists('acme_users_manage_get_credits_map')) {
-    function acme_users_manage_get_credits_map(array $rows): array
-    {
-        global $wpdb;
-
-        $lotsTable = function_exists('acme_table_credit_lots')
-            ? acme_table_credit_lots()
-            : ($wpdb->prefix . 'credit_lots');
-
-        $nowMysql = current_time('mysql');
-
-        $userIds = array_values(array_unique(array_map(function ($row) {
-            return (int) $row->ID;
-        }, $rows)));
-
-        if (empty($userIds)) {
-            return [];
-        }
-
-        $placeholders = implode(',', array_fill(0, count($userIds), '%d'));
-
-        $sql = $wpdb->prepare(
-            "SELECT owner_user_id AS user_id,
-                    COALESCE(SUM(GREATEST(credits_total - credits_used, 0)), 0) AS available
-             FROM {$lotsTable}
-             WHERE owner_user_id IN ($placeholders)
-               AND (expires_at IS NULL OR expires_at >= %s)
-             GROUP BY owner_user_id",
-            array_merge($userIds, [$nowMysql])
-        );
-
-        $lotSums = $wpdb->get_results($sql);
-        $creditsMap = [];
-
-        foreach ((array) $lotSums as $row) {
-            $creditsMap[(int) $row->user_id] = (int) $row->available;
-        }
-
-        return $creditsMap;
-    }
-}
-#===================================
-if (!function_exists('acme_users_manage_filter_rows')) {
-    function acme_users_manage_filter_rows(array $rows, array $filters, bool $isAdmin): array
-    {
-        $filterMaster = (int) ($filters['filter_master'] ?? 0);
-        $filterStatus = (string) ($filters['filter_status'] ?? 'all');
-        $filterCredits = (string) ($filters['filter_credits'] ?? 'all');
-        $queryNormalized = (string) ($filters['q_norm'] ?? '');
-
-        if ($isAdmin && $filterMaster > 0) {
-            $rows = array_values(array_filter($rows, function ($row) use ($filterMaster) {
-                $isChildRow = ((int) $row->ID === $filterMaster);
-                $isGrandchildOfMaster = ((int) ($row->master_id ?? 0) === $filterMaster);
-
-                return $isChildRow || $isGrandchildOfMaster;
-            }));
-        }
-
-        if ($filterStatus === 'active' || $filterStatus === 'inactive') {
-            $rows = array_values(array_filter($rows, function ($row) use ($filterStatus) {
-                $status = (string) ($row->status ?? 'active');
-                return $status === $filterStatus;
-            }));
-        }
-
-        if ($queryNormalized !== '') {
-            $rows = array_values(array_filter($rows, function ($row) use ($queryNormalized) {
-                $name = mb_strtolower((string) ($row->display_name ?? ''));
-                $email = mb_strtolower((string) ($row->user_email ?? ''));
-                $phone = mb_strtolower((string) ($row->phone ?? ''));
-
-                return strpos($name, $queryNormalized) !== false
-                    || strpos($email, $queryNormalized) !== false
-                    || strpos($phone, $queryNormalized) !== false;
-            }));
-        }
-
-        if ($filterCredits === 'has') {
-            $rows = array_values(array_filter($rows, function ($row) {
-                return (int) ($row->credits ?? 0) > 0;
-            }));
-        } elseif ($filterCredits === 'none') {
-            $rows = array_values(array_filter($rows, function ($row) {
-                return (int) ($row->credits ?? 0) === 0;
-            }));
-        }
-
-        usort($rows, function ($left, $right) {
-            return strcasecmp($left->display_name ?? '', $right->display_name ?? '');
-        });
-
-        return $rows;
-    }
-}
-#===================================
-
-#===================================
-
-
 /**
  * ============================================================
  * 10) SHORTCODE PRINCIPAL (Elementor): [acme_my_grandchildren_manage]
@@ -1459,8 +1053,8 @@ if (!function_exists('acme_users_manage_filter_rows')) {
  * ============================================================
  */
 
-add_shortcode('acme_my_grandchildren_manage', function ($atts) {
-    if (!is_user_logged_in()) {
+function acme_shortcode_my_grandchildren_manage($atts = []) {
+        if (!is_user_logged_in()) {
         return '<p>Você precisa estar logado.</p>';
     }
 
@@ -1820,7 +1414,7 @@ add_shortcode('acme_my_grandchildren_manage', function ($atts) {
 <?php
 
     return ob_get_clean();
-});
+};
 
 
 #CSS DO EDIT USER
@@ -1847,8 +1441,7 @@ function acme_maybe_enqueue_edit_user_assets()
  * 11) SHORTCODE Editar Usuarios (Elementor): [acme_edit_user]
  * ============================================================
  */
-add_shortcode('acme_edit_user', function () {
-
+function acme_shortcode_edit_user() {
     if (!is_user_logged_in()) {
         return '<p>Você precisa estar logado.</p>';
     }
@@ -2007,7 +1600,7 @@ add_shortcode('acme_edit_user', function () {
 
 <?php
     return ob_get_clean();
-});
+};
 
 
 /**
@@ -2016,8 +1609,7 @@ add_shortcode('acme_edit_user', function () {
  * ============================================================
  */
 
-add_shortcode('acme_view_user', function () {
-
+function acme_shortcode_view_user() {
     if (!is_user_logged_in())
         return '<p>Você precisa estar logado.</p>';
 
@@ -2207,14 +1799,14 @@ add_shortcode('acme_view_user', function () {
 
 <?php
     return ob_get_clean();
-});
+};
 
 /**
  * ============================================================
  * 13) SHORTCODE Adicionar Usuarios (Elementor): [acme_add_user]
  * ============================================================
  */
-add_shortcode('acme_add_user', function () {
+function acme_shortcode_add_user() {
 
     if (!is_user_logged_in()) {
         return '<div style="padding:12px;border:1px solid #f2c;border-radius:10px;">Você precisa estar logado.</div>';
@@ -2333,7 +1925,7 @@ add_shortcode('acme_add_user', function () {
 <?php
 
     return ob_get_clean();
-});
+};
 
 /**
  * ============================================================
@@ -2341,7 +1933,6 @@ add_shortcode('acme_add_user', function () {
  * ============================================================
  */
 
-add_action('admin_post_acme_fe_create_user', 'acme_fe_create_user');
 
 function acme_fe_create_user()
 {
@@ -2463,8 +2054,7 @@ function acme_fe_create_user()
  */
 
 
-add_shortcode('acme_view_user_fixed', function () {
-
+function acme_shortcode_view_user_fixed() {
     if (!is_user_logged_in())
         return '<p>Você precisa estar logado.</p>';
 
@@ -2575,13 +2165,12 @@ add_shortcode('acme_view_user_fixed', function () {
 
 <?php
     return ob_get_clean();
-});
+};
 
 
 #==========================
 #usuario atual
-add_shortcode('acme_view_user_atual', function () {
-
+function acme_shortcode_view_user_atual() {
     if (!is_user_logged_in())
         return '<p>Você precisa estar logado.</p>';
 
@@ -2758,7 +2347,7 @@ add_shortcode('acme_view_user_atual', function () {
 
     <?php
     return ob_get_clean();
-});
+};
 
 
 
@@ -2769,9 +2358,6 @@ add_shortcode('acme_view_user_atual', function () {
  * Edit perfil - shortcode consolidado
  */
 
-if (!shortcode_exists('acme_edit_user_page')) {
-    add_shortcode('acme_edit_user_page', 'acme_shortcode_edit_user_page');
-}
 
 if (!function_exists('acme_register_edit_user_page_assets')) {
     function acme_register_edit_user_page_assets()
@@ -2925,9 +2511,6 @@ if (!function_exists('acme_shortcode_edit_user_page')) {
  * Shortcode dedicado para Créditos (Conceder / Estornar)
  * Uso: [acme_edit_user_credits_page]
  */
-if (!shortcode_exists('acme_edit_user_credits_page')) {
-    add_shortcode('acme_edit_user_credits_page', 'acme_shortcode_edit_user_credits_page');
-}
 
 if (!function_exists('acme_shortcode_edit_user_credits_page')) {
     function acme_shortcode_edit_user_credits_page()
