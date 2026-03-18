@@ -41,7 +41,7 @@ CREATE TABLE IF NOT EXISTS `wp_services` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   `slug` VARCHAR(50) NOT NULL,
   `name` VARCHAR(120) NOT NULL,
-  `credit_cost` INT NOT NULL DEFAULT 1,
+  `credits_cost` INT NOT NULL DEFAULT 1,
   `is_active` TINYINT(1) NOT NULL DEFAULT 1,
   `created_at` DATETIME NOT NULL,
   `updated_at` DATETIME NOT NULL,

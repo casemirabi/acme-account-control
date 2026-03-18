@@ -1919,7 +1919,10 @@ add_shortcode('acme_recover_credits_form', function () {
   }
 
   $me = wp_get_current_user();
-  $is_child = in_array('child', (array) $me->roles, true);
+  $is_child = function_exists('acme_user_has_role')
+    ? acme_user_has_role($me, 'child')
+    : in_array('child', (array) $me->roles, true);
+
   $is_admin = current_user_can('manage_options');
 
   if (!$is_child && !$is_admin) {
@@ -1933,20 +1936,7 @@ add_shortcode('acme_recover_credits_form', function () {
 
   $services = $wpdb->get_results("SELECT slug, name, credits_cost FROM {$servicesT} ORDER BY name ASC");
 
-  $grand_ids = (array) $wpdb->get_col($wpdb->prepare(
-    "SELECT child_user_id FROM {$linksT} WHERE parent_user_id=%d AND depth=2",
-    (int) $me->ID
-  ));
-
-  $grand_ids = array_values(array_unique(array_map('intval', $grand_ids)));
-  $grand_users = !empty($grand_ids)
-    ? get_users([
-        'include' => $grand_ids,
-        'orderby' => 'display_name',
-        'order'   => 'ASC',
-        'number'  => 500
-      ])
-    : [];
+  $recoverUsers = [];
 
   if ($is_admin) {
     $master_ids = (array) $wpdb->get_col(
@@ -1957,7 +1947,7 @@ add_shortcode('acme_recover_credits_form', function () {
 
     $master_ids = array_values(array_unique(array_map('intval', $master_ids)));
 
-    $grand_users = !empty($master_ids)
+    $recoverUsers = !empty($master_ids)
       ? get_users([
           'include' => $master_ids,
           'orderby' => 'display_name',
@@ -1965,12 +1955,76 @@ add_shortcode('acme_recover_credits_form', function () {
           'number'  => 500,
         ])
       : [];
+  } else {
+    $grand_ids = function_exists('acme_get_grandchildren_of_child')
+      ? acme_get_grandchildren_of_child((int) $me->ID)
+      : (array) $wpdb->get_col($wpdb->prepare(
+          "SELECT child_user_id FROM {$linksT} WHERE parent_user_id=%d AND depth=2",
+          (int) $me->ID
+        ));
+
+    $grand_ids = array_values(array_unique(array_map('intval', (array) $grand_ids)));
+
+    $recoverUsers = !empty($grand_ids)
+      ? get_users([
+          'include' => $grand_ids,
+          'orderby' => 'display_name',
+          'order'   => 'ASC',
+          'number'  => 500
+        ])
+      : [];
   }
 
-  $title = 'Recuperação de créditos';
-  $subtitle = $is_admin
-    ? 'Recupere créditos de Masters conforme o escopo permitido.'
-    : 'Recupere créditos do Usuário.';
+  $msg = isset($_GET['acme_msg']) ? sanitize_text_field($_GET['acme_msg']) : '';
+  $err = isset($_GET['acme_err']) ? sanitize_text_field(wp_unslash($_GET['acme_err'])) : '';
+
+  $target_id = 0;
+  $target_name = '';
+  $isEditContext = false;
+
+  if (isset($_GET['user_id'])) {
+    $requested_user_id = (int) $_GET['user_id'];
+
+    if ($requested_user_id > 0) {
+      $target_user = get_user_by('id', $requested_user_id);
+
+      if ($target_user) {
+        $can_use_target = false;
+
+        if ($is_admin) {
+          $can_use_target = function_exists('acme_user_has_role')
+            ? acme_user_has_role($target_user, 'child')
+            : in_array('child', (array) $target_user->roles, true);
+        } elseif ($is_child) {
+          $allowed_ids = array_map(
+            'intval',
+            function_exists('acme_get_grandchildren_of_child')
+              ? acme_get_grandchildren_of_child((int) $me->ID)
+              : []
+          );
+
+          $can_use_target = in_array((int) $requested_user_id, $allowed_ids, true);
+        }
+
+        if ($can_use_target) {
+          $target_id = (int) $requested_user_id;
+          $target_name = $target_user->display_name;
+          $isEditContext = true;
+        }
+      }
+    }
+  }
+
+  if ($isEditContext) {
+    $title = 'Créditos / recuperação';
+    $subtitle = 'Gerencie a recuperação de créditos do usuário conforme o escopo permitido.';
+  } else {
+    $title = 'Recuperação de créditos';
+    $subtitle = $is_admin
+      ? 'Recupere créditos de Masters conforme o escopo permitido.'
+      : 'Recupere créditos do Usuário.';
+  }
+
   $btn = 'Recuperar créditos';
 
   ob_start();
@@ -1995,23 +2049,49 @@ add_shortcode('acme_recover_credits_form', function () {
 
     <div style="padding:14px 16px;">
 
+      <?php if ($msg === 'ok'): ?>
+        <div style="padding:10px 12px;border-radius:12px;background:#ecfdf5;border:1px solid #a7f3d0;color:#065f46;font-weight:900;margin-bottom:12px;">
+          Ação realizada com sucesso.
+        </div>
+      <?php elseif ($msg === 'err'): ?>
+        <div style="padding:10px 12px;border-radius:12px;background:#fef2f2;border:1px solid #fecaca;color:#991b1b;font-weight:900;margin-bottom:12px;">
+          Erro ao recuperar créditos.
+          <?php if ($err): ?>
+            <div style="margin-top:6px;font-weight:700;opacity:.95"><?php echo esc_html($err); ?></div>
+          <?php endif; ?>
+        </div>
+      <?php endif; ?>
+
       <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="display:grid;gap:12px;">
         <input type="hidden" name="action" value="acme_recover_credits">
         <?php wp_nonce_field('acme_recover_credits'); ?>
 
-        <div>
-          <label style="display:block;font-size:12px;margin-bottom:6px;color:#64748b;font-weight:900;">
-            <?php echo $is_admin ? 'Master' : 'Usuário'; ?>
-          </label>
-          <select name="user_id" required class="acme-inp">
-            <option value="">Selecione...</option>
-            <?php foreach ((array) $grand_users as $u): ?>
-              <option value="<?php echo (int) $u->ID; ?>">
-                <?php echo esc_html($u->display_name . ' (#' . (int) $u->ID . ')'); ?>
+        <?php if ($target_id > 0): ?>
+          <div>
+            <label style="display:block;font-size:12px;margin-bottom:6px;color:#64748b;font-weight:900;">
+              <?php echo esc_html($is_admin ? 'Master' : 'Usuário'); ?>
+            </label>
+            <select name="user_id" required class="acme-inp">
+              <option value="<?php echo (int) $target_id; ?>">
+                <?php echo esc_html($target_name); ?>
               </option>
-            <?php endforeach; ?>
-          </select>
-        </div>
+            </select>
+          </div>
+        <?php else: ?>
+          <div>
+            <label style="display:block;font-size:12px;margin-bottom:6px;color:#64748b;font-weight:900;">
+              <?php echo esc_html($is_admin ? 'Master' : 'Usuário'); ?>
+            </label>
+            <select name="user_id" required class="acme-inp">
+              <option value="">Selecione...</option>
+              <?php foreach ((array) $recoverUsers as $u): ?>
+                <option value="<?php echo (int) $u->ID; ?>">
+                  <?php echo esc_html($u->display_name . ' (#' . (int) $u->ID . ')'); ?>
+                </option>
+              <?php endforeach; ?>
+            </select>
+          </div>
+        <?php endif; ?>
 
         <div>
           <label style="display:block;font-size:12px;margin-bottom:6px;color:#64748b;font-weight:900;">
@@ -2057,7 +2137,6 @@ add_shortcode('acme_recover_credits_form', function () {
   <?php
   return ob_get_clean();
 });
-
 
 #==============================================================
 
@@ -2449,12 +2528,14 @@ function acme_shortcode_grant_credits()
                 <?php if ($target_id > 0): ?>
                     <div>
                         <label style="display:block;font-size:12px;margin-bottom:6px;color:#64748b;font-weight:900;">Usuário</label>
+
                         <select name="user_id" required class="acme-inp">
                             <option value="<?php echo (int) $target_id; ?>">
                                 <?php echo esc_html($target_name); ?>
                             </option>
                         </select>
                     </div>
+
                 <?php elseif ($is_admin): ?>
                     <input type="hidden" name="user_id" id="acme_target_user_id" value="">
 

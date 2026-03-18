@@ -283,3 +283,4 @@ if (!function_exists('acme_credits_grant')) {
     return ['success' => true, 'message' => 'Créditos concedidos.', 'tx_id' => $tx_id];
   }
 }
+

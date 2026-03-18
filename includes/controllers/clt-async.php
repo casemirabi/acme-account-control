@@ -927,7 +927,12 @@ function acme_api_clt_webhook(WP_REST_Request $req)
         }
       }
 
-      acme_consume_credit($uid, 'clt', 1, $debit_rid);
+      //acme_consume_credit($uid, 'clt', 1, $debit_rid);
+      $cost = acme_get_service_credit_cost('clt');
+
+      if ($cost > 0) {
+        acme_consume_credit($uid, 'clt', $cost, $debit_rid);
+      }
     }
 
     /**

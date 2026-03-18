@@ -18,7 +18,7 @@ function acme_services_activate(){
     id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     slug VARCHAR(50) NOT NULL,
     name VARCHAR(120) NOT NULL,
-    credit_cost INT NOT NULL DEFAULT 1,
+    credits_cost INT NOT NULL DEFAULT 1,
     is_active TINYINT(1) NOT NULL DEFAULT 1,
     created_at DATETIME NOT NULL,
     updated_at DATETIME NOT NULL,
@@ -27,4 +27,28 @@ function acme_services_activate(){
   ) {$charset};";
 
   dbDelta($sql);
+}
+
+function acme_get_service_credit_cost($slug)
+{
+    global $wpdb;
+
+    $table = $wpdb->prefix . 'services';
+
+    $cost = $wpdb->get_var(
+        $wpdb->prepare(
+            "SELECT credits_cost 
+             FROM $table 
+             WHERE slug = %s 
+             AND is_active = 1 
+             LIMIT 1",
+            $slug
+        )
+    );
+
+    if ($cost === null) {
+        return 0;
+    }
+
+    return (int) $cost;
 }

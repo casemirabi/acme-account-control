@@ -760,7 +760,10 @@ function acme_fe_toggle_status()
     }
 
     $result = acme_users_toggle_status($actorId, $targetId, $action);
-    $redirectUrl = wp_get_referer() ?: home_url('/');
+    #$redirectUrl = wp_get_referer() ?: home_url('/');
+    $redirectUrl = isset($_POST['redirect_to'])
+        ? esc_url_raw(wp_unslash($_POST['redirect_to']))
+        : (wp_get_referer() ?: home_url('/'));
 
     if (!$result['success']) {
         if (in_array($result['code'], ['protected_user'], true)) {
@@ -1974,6 +1977,10 @@ add_shortcode('acme_edit_user', function () {
                         <input type="hidden" name="action" value="acme_fe_toggle_status">
                         <input type="hidden" name="user_id" value="<?php echo (int) $target_id; ?>">
                         <input type="hidden" name="do" value="<?php echo esc_attr($actionStatus); ?>">
+                        <input
+                            type="hidden"
+                            name="redirect_to"
+                            value="<?php echo esc_url(get_permalink() . '?user_id=' . (int) $target_id); ?>">
                         <?php wp_nonce_field('acme_fe_toggle_' . (int) $target_id); ?>
 
                         <button type="submit" class="acme-btn" style="<?php echo esc_attr($statusButtonStyle); ?>">
@@ -2021,10 +2028,13 @@ add_shortcode('acme_view_user', function () {
     $target_id = isset($_GET['user_id']) ? (int) $_GET['user_id'] : 0;
     $nonce = isset($_GET['nonce']) ? (string) $_GET['nonce'] : '';
 
-    /*if (!$target_id || !$nonce)
-        return '<p>Usuário inválido.</p>';
-    if (!wp_verify_nonce($nonce, 'acme_edit_user_' . $target_id))
-        return '<p>Link inválido/expirado.</p>';*/
+    $messageCode = isset($_GET['acme_msg'])
+        ? sanitize_text_field(wp_unslash($_GET['acme_msg']))
+        : '';
+
+    $errorMessage = isset($_GET['acme_err'])
+        ? sanitize_text_field(wp_unslash($_GET['acme_err']))
+        : '';
 
     // Proteções
     if ($target_id === acme_master_admin_id() || user_can($target_id, 'administrator')) {
@@ -2102,6 +2112,17 @@ add_shortcode('acme_view_user', function () {
     $back_url = wp_get_referer() ?: site_url('/');
 
     ob_start(); ?>
+
+    <?php if ($messageCode === 'ok'): ?>
+        <div style="max-width:1100px;margin:0 auto 12px auto;padding:10px 12px;border-radius:12px;background:#ecfdf5;border:1px solid #a7f3d0;color:#065f46;font-weight:900;">
+            Status atualizado.
+        </div>
+    <?php elseif ($messageCode === 'err_master'): ?>
+        <div style="max-width:1100px;margin:0 auto 12px auto;padding:10px 12px;border-radius:12px;background:#fff7ed;border:1px solid #fdba74;color:#9a3412;font-weight:900;">
+            <?php echo esc_html($errorMessage ?: 'Não é possível ativar este usuário porque o Master está inativo.'); ?>
+        </div>
+    <?php endif; ?>
+
 
     <div style="max-width:1100px;margin:0 auto;padding:12px 16px 24px;">
 
