@@ -2920,3 +2920,87 @@ if (!function_exists('acme_shortcode_edit_user_page')) {
         return ob_get_clean();
     }
 }
+
+/**
+ * Shortcode dedicado para Créditos (Conceder / Estornar)
+ * Uso: [acme_edit_user_credits_page]
+ */
+if (!shortcode_exists('acme_edit_user_credits_page')) {
+    add_shortcode('acme_edit_user_credits_page', 'acme_shortcode_edit_user_credits_page');
+}
+
+if (!function_exists('acme_shortcode_edit_user_credits_page')) {
+    function acme_shortcode_edit_user_credits_page()
+    {
+        if (!is_user_logged_in()) {
+            return '<p>Você precisa estar logado.</p>';
+        }
+
+        $actorId = get_current_user_id();
+        $actor = wp_get_current_user();
+
+        $isAdmin = user_can($actorId, 'administrator');
+        $isChild = in_array('child', (array) $actor->roles, true);
+
+        if (!$isAdmin && !$isChild) {
+            return '<p>Sem permissão.</p>';
+        }
+
+        // ✅ apenas carrega assets
+        acme_enqueue_edit_user_page_assets();
+
+        // ✅ shortcodes internos controlam usuário
+        $grantCreditsHtml   = do_shortcode('[acme_grant_credits]');
+        $recoverCreditsHtml = do_shortcode('[acme_recover_credits_form]');
+
+        ob_start();
+        ?>
+
+        <div class="acme-my-profile-page acme-edit-user-credits-page">
+
+            <section class="acme-profile-section">
+                <div class="acme-profile-card">
+
+                    <div class="acme-credit-toggle" data-acme-credit-toggle>
+                        <button
+                            type="button"
+                            class="acme-credit-toggle__button is-active"
+                            data-acme-credit-target="grant">
+                            Conceder
+                        </button>
+
+                        <button
+                            type="button"
+                            class="acme-credit-toggle__button"
+                            data-acme-credit-target="recover">
+                            Estornar
+                        </button>
+                    </div>
+
+                    <div
+                        class="acme-credit-toggle__panel is-active"
+                        data-acme-credit-panel="grant">
+
+                        <?php echo $grantCreditsHtml; ?>
+
+                    </div>
+
+                    <div
+                        class="acme-credit-toggle__panel"
+                        data-acme-credit-panel="recover"
+                        hidden>
+
+                        <?php echo $recoverCreditsHtml; ?>
+
+                    </div>
+
+                </div>
+            </section>
+
+        </div>
+
+        <?php
+
+        return ob_get_clean();
+    }
+}
