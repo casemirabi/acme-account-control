@@ -1845,7 +1845,7 @@ add_shortcode('acme_clt_panel', function () {
       $pdf = '<a class="acme-btn" target="_blank" rel="noopener" href="' . esc_url($pdf_url) . '">Baixar PDF</a>';
     }
 
-    $error = $r['error_message'] ?? '';
+    $error = ($status === 'failed') ? 'Falha na consulta' : '';//$error = $r['error_message'] ?? '';
 
     $status_valor = ($status === 'completed') ? 'Completo' : (($status === 'failed') ? 'Falha' : 'Pendente');
 

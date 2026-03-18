@@ -393,14 +393,6 @@ function acme_api_clt_start(WP_REST_Request $req)
 
       /*=====================================*/
 
-      /*if (!empty($row['error_message'])) {
-        $base['business_warning'] = [
-          'code' => $row['error_code'] ?? null,
-          'message' => $row['error_message'],
-        ];
-      }
-
-      $base['message'] = 'Consulta CLT concluída.';*/
 
       $mensagemPadrao = 'Consulta CLT concluída.';
 
@@ -428,16 +420,13 @@ function acme_api_clt_start(WP_REST_Request $req)
 
     // failed
     if (($row['status'] ?? '') === 'failed') {
-      $base['waited'] = true;
-      $base['status'] = 'failed';
-      $base['provider_request_id'] = $row['provider_request_id'] ?? null;
-      $base['message'] = 'Consulta CLT falhou.';
-      $base['error'] = [
-        'code' => $row['error_code'] ?? 'UNKNOWN',
-        'message' => $row['error_message'] ?? 'Falha desconhecida',
-      ];
-      return acme_ok($base, 200);
-    }
+  $base['waited'] = true;
+  $base['status'] = 'failed';
+  $base['provider_request_id'] = $row['provider_request_id'] ?? null;
+  $base['message'] = 'Consulta CLT falhou.';
+  $base['error'] = acme_clt_public_failed_error();
+  return acme_ok($base, 200);
+}
   }
 
   // Retorno normal (pending)
@@ -602,12 +591,19 @@ function acme_api_clt_status(WP_REST_Request $req)
     $data['message'] = 'Consulta CLT concluída.';
   }
 
-  if ($row['status'] === 'failed') {
-    $data['error'] = [
-      'code' => $row['error_code'],
-      'message' => $row['error_message'],
-    ];
+  if (!function_exists('acme_clt_public_failed_error')) {
+    function acme_clt_public_failed_error(): array
+    {
+      return [
+        'code' => 'FAILED',
+        'message' => "Houve um erro no processamento da consulta. Revise os dados, aguarde alguns instantes e tente novamente. Se o problema persistir, entre em contato com o administrador.",
+      ];
+    }
   }
+
+  if ($row['status'] === 'failed') {
+  $data['error'] = acme_clt_public_failed_error();
+}
 
   return acme_ok([
     'success' => true,
@@ -713,9 +709,9 @@ function acme_api_clt_webhook(WP_REST_Request $req)
   $errorField = $payload['error'] ?? $payload['message'] ?? null;
 
   if (is_array($errorField)) {
-    $raw_error_message = (string) ($errorField['message'] ?? 'Falha na consulta');
+    $raw_error_message = (string) ($errorField['message'] ?? 'Houve um erro no processamento da consulta. \nRevise os dados, aguarde alguns instantes e tente novamente. Se o problema persistir, entre em contato com o administrador.');
   } else {
-    $raw_error_message = (string) ($errorField ?? ($success ? '' : 'Falha na consulta'));
+    $raw_error_message = (string) ($errorField ?? ($success ? '' : 'Houve um erro no processamento da consulta. \nRevise os dados, aguarde alguns instantes e tente novamente. Se o problema persistir, entre em contato com o administrador.'));
   }
 
   $raw_message_lc = mb_strtolower(trim($raw_error_message), 'UTF-8');
