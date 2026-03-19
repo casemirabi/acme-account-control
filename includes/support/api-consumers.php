@@ -191,7 +191,7 @@ if (!function_exists('acme_api_consumer_revoke')) {
 }
 
 if (!function_exists('acme_api_consumer_get_all')) {
-  function acme_api_consumer_get_all(int $limit = 200): array
+  function acme_api_consumer_get_all(int $limit = 200, array $filters = []): array
   {
     global $wpdb;
 
@@ -200,8 +200,48 @@ if (!function_exists('acme_api_consumer_get_all')) {
     $limit = max(1, min(500, $limit));
     $tableName = acme_api_consumers_table();
 
-    $sql = $wpdb->prepare("SELECT * FROM {$tableName} ORDER BY id DESC LIMIT %d", $limit);
-    $rows = $wpdb->get_results($sql, ARRAY_A);
+    $whereParts = [];
+    $params     = [];
+
+    // =========================
+    // Filtro por usuário
+    // =========================
+    if (!empty($filters['user_id'])) {
+        $whereParts[] = 'wp_user_id = %d';
+        $params[]     = (int) $filters['user_id'];
+    }
+
+    // =========================
+    // Filtro por status
+    // =========================
+    if (!empty($filters['status'])) {
+        $whereParts[] = 'status = %s';
+        $params[]     = sanitize_text_field($filters['status']);
+    }
+
+    // =========================
+    // Filtro por serviço
+    // =========================
+    if (!empty($filters['service'])) {
+        $whereParts[] = 'allowed_services LIKE %s';
+        $params[]     = '%' . $wpdb->esc_like($filters['service']) . '%';
+    }
+
+    $whereSql = '';
+
+    if (!empty($whereParts)) {
+        $whereSql = 'WHERE ' . implode(' AND ', $whereParts);
+    }
+
+    $sql = "SELECT * FROM {$tableName}
+            {$whereSql}
+            ORDER BY id DESC
+            LIMIT %d";
+
+    $params[] = $limit;
+
+    $prepared = $wpdb->prepare($sql, $params);
+    $rows = $wpdb->get_results($prepared, ARRAY_A);
 
     return is_array($rows) ? $rows : [];
   }

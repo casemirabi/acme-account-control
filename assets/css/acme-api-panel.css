@@ -1,6 +1,5 @@
 .acme-api-panel {
     padding: 24px;
-    background: #f3f4f6;
     border-radius: 16px;
     margin: 24px 0;
     color: #0f172a;
@@ -125,6 +124,17 @@
     margin-bottom: 24px;
 }
 
+    /* Faz o card da esquerda ocupar toda altura da célula do grid */
+.acme-api-grid > div:first-child {
+    display: flex;
+}
+
+.acme-api-grid > div:first-child > .acme-api-card {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
 .acme-api-summary-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -173,7 +183,8 @@
 }
 
 .acme-api-field input,
-.acme-api-field select {
+.acme-api-field select
+.filter_user_id {
     width: 100%;
     border: 1px solid #dbe1ea;
     border-radius: 12px;
@@ -195,7 +206,7 @@
     align-items: center;
     gap: 8px;
     color: #1e293b;
-    font-size: 14px;
+    font-size: 1px;
 }
 
 .acme-api-table-wrap {
@@ -613,5 +624,11 @@
     background: #f8fafc !important;
     color: #0f172a !important;
     vertical-align: middle !important;
+    font-size: 12px;
 }
 
+
+.acme-api-panel select#acme-filter_user_id {
+    font-size: 12px;
+
+}
