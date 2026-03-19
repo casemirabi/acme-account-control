@@ -515,7 +515,8 @@ function acme_handle_activate()
  * ============================================================
  */
 
-function acme_shortcode_my_grandchildren($atts) {
+function acme_shortcode_my_grandchildren($atts)
+{
 
     if (!is_user_logged_in())
         return '<p>Você precisa estar logado.</p>';
@@ -1053,8 +1054,9 @@ function acme_fe_update_phone()
  * ============================================================
  */
 
-function acme_shortcode_my_grandchildren_manage($atts = []) {
-        if (!is_user_logged_in()) {
+function acme_shortcode_my_grandchildren_manage($atts = [])
+{
+    if (!is_user_logged_in()) {
         return '<p>Você precisa estar logado.</p>';
     }
 
@@ -1441,7 +1443,8 @@ function acme_maybe_enqueue_edit_user_assets()
  * 11) SHORTCODE Editar Usuarios (Elementor): [acme_edit_user]
  * ============================================================
  */
-function acme_shortcode_edit_user() {
+function acme_shortcode_edit_user()
+{
     if (!is_user_logged_in()) {
         return '<p>Você precisa estar logado.</p>';
     }
@@ -1609,7 +1612,8 @@ function acme_shortcode_edit_user() {
  * ============================================================
  */
 
-function acme_shortcode_view_user() {
+function acme_shortcode_view_user()
+{
     if (!is_user_logged_in())
         return '<p>Você precisa estar logado.</p>';
 
@@ -1806,7 +1810,8 @@ function acme_shortcode_view_user() {
  * 13) SHORTCODE Adicionar Usuarios (Elementor): [acme_add_user]
  * ============================================================
  */
-function acme_shortcode_add_user() {
+function acme_shortcode_add_user()
+{
 
     if (!is_user_logged_in()) {
         return '<div style="padding:12px;border:1px solid #f2c;border-radius:10px;">Você precisa estar logado.</div>';
@@ -1825,7 +1830,24 @@ function acme_shortcode_add_user() {
     }
 
     $allowed_roles = $is_admin ? ['grandchild', 'child'] : ['grandchild'];
-    $children      = $is_admin ? get_users(['role' => 'child']) : [];
+
+    //$children      = $is_admin ? get_users(['role' => 'child']) : [];
+    $children = [];
+
+    if ($is_admin) {
+        $allChildren = get_users([
+            'role'    => 'child',
+            'orderby' => 'display_name',
+            'order'   => 'ASC',
+            'number'  => 500,
+        ]);
+
+        $children = array_values(array_filter($allChildren, static function ($childUser) {
+            return $childUser instanceof WP_User
+                && acme_account_is_active((int) $childUser->ID);
+        }));
+    }
+
     $back_url      = wp_get_referer() ?: site_url('/');
     $home_url = home_url('/');
 
@@ -1856,6 +1878,14 @@ function acme_shortcode_add_user() {
         <?php elseif (isset($_GET['acme_msg']) && $_GET['acme_msg'] === 'error'): ?>
             <div style="padding:12px 16px;border-top:1px solid #eef2f7;color:#b00020;font-weight:700;">
                 Erro ao criar usuário. Verifique os dados.
+            </div>
+        <?php elseif (isset($_GET['acme_msg']) && $_GET['acme_msg'] === 'parent_inactive'): ?>
+            <div style="padding:12px 16px;border-top:1px solid #eef2f7;color:#991b1b;font-weight:700;">
+                Não é permitido criar Sub-Login para Master inativo.
+            </div>
+        <?php elseif (isset($_GET['acme_msg']) && $_GET['acme_msg'] === 'missing_parent'): ?>
+            <div style="padding:12px 16px;border-top:1px solid #eef2f7;color:#991b1b;font-weight:700;">
+                Selecione um Master responsável ativo para criar o Sub-Login.
             </div>
         <?php endif; ?>
 
@@ -1972,6 +2002,37 @@ function acme_fe_create_user()
         exit;
     }
 
+    // Bloqueio: não permitir Sub-Login vinculado a Master inativo
+    if ($role === 'grandchild') {
+        $parentChildId = 0;
+
+        if ($is_admin) {
+            $parentChildId = isset($_POST['parent_child_id']) ? (int) $_POST['parent_child_id'] : 0;
+
+            if ($parentChildId <= 0) {
+                wp_safe_redirect(add_query_arg('acme_msg', 'missing_parent', wp_get_referer() ?: site_url('/add-user/')));
+                exit;
+            }
+
+            $parentChildUser = get_user_by('id', $parentChildId);
+            if (
+                !$parentChildUser ||
+                !acme_user_has_role($parentChildUser, 'child') ||
+                !acme_account_is_active($parentChildId)
+            ) {
+                wp_safe_redirect(add_query_arg('acme_msg', 'parent_inactive', wp_get_referer() ?: site_url('/add-user/')));
+                exit;
+            }
+        } else {
+            // Filho logado criando Sub-Login: ele próprio precisa estar ativo
+            if (!acme_account_is_active($actor_id)) {
+                wp_safe_redirect(add_query_arg('acme_msg', 'parent_inactive', wp_get_referer() ?: site_url('/add-user/')));
+                exit;
+            }
+        }
+    }
+
+
     // username simples baseado no email
     $base_login = sanitize_user(current(explode('@', $email)), true);
     if (!$base_login)
@@ -1983,6 +2044,7 @@ function acme_fe_create_user()
         $user_login = $base_login . $i;
         $i++;
     }
+
 
     $user_id = wp_create_user($user_login, $password, $email);
     if (is_wp_error($user_id)) {
@@ -2054,7 +2116,8 @@ function acme_fe_create_user()
  */
 
 
-function acme_shortcode_view_user_fixed() {
+function acme_shortcode_view_user_fixed()
+{
     if (!is_user_logged_in())
         return '<p>Você precisa estar logado.</p>';
 
@@ -2170,7 +2233,8 @@ function acme_shortcode_view_user_fixed() {
 
 #==========================
 #usuario atual
-function acme_shortcode_view_user_atual() {
+function acme_shortcode_view_user_atual()
+{
     if (!is_user_logged_in())
         return '<p>Você precisa estar logado.</p>';
 
@@ -2502,7 +2566,7 @@ if (!function_exists('acme_shortcode_edit_user_page')) {
 
         </div>
 
-<?php
+    <?php
         return ob_get_clean();
     }
 }
@@ -2537,7 +2601,7 @@ if (!function_exists('acme_shortcode_edit_user_credits_page')) {
         $recoverCreditsHtml = do_shortcode('[acme_recover_credits_form]');
 
         ob_start();
-        ?>
+    ?>
 
         <div class="acme-my-profile-page acme-edit-user-credits-page">
 
@@ -2582,7 +2646,7 @@ if (!function_exists('acme_shortcode_edit_user_credits_page')) {
 
         </div>
 
-        <?php
+<?php
 
         return ob_get_clean();
     }
