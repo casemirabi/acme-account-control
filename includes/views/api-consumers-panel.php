@@ -104,7 +104,7 @@ if (!empty($lastUsedValues)) {
                         </span>
                     </p>
 
-                
+
                 </div>
 
                 <div class="acme-api-actions">
@@ -189,7 +189,8 @@ if (!empty($lastUsedValues)) {
                 <div class="acme-api-summary-card">
                     <span class="acme-api-summary-label">Último uso da API</span>
                     <span class="acme-api-summary-value" style="font-size:18px;">
-                        <?php echo esc_html($lastUsageLabel); ?>
+                        <?php $lastUsageLabel = esc_html($lastUsageLabel) ? date_i18n('d/m/Y H:i:s', strtotime(esc_html($lastUsageLabel))) : ''; ?>
+                        <?php echo $lastUsageLabel; ?>
                     </span>
                 </div>
             </div>
@@ -201,7 +202,6 @@ if (!empty($lastUsedValues)) {
                     <table class="acme-api-table">
                         <thead>
                             <tr>
-                                <th>ID</th>
                                 <th>Nome</th>
                                 <th>Usuário</th>
                                 <th>Serviços</th>
@@ -223,7 +223,7 @@ if (!empty($lastUsedValues)) {
                                     $wpUserId = (int) ($consumerRow['wp_user_id'] ?? 0);
                                     $linkedUser = $wpUserId > 0 ? get_user_by('id', $wpUserId) : false;
                                     $linkedUserLabel = $linkedUser
-                                        ? sprintf('#%d — %s', $wpUserId, $linkedUser->display_name)
+                                        ? sprintf('%s', $linkedUser->display_name)
                                         : '#' . $wpUserId . ' — usuário não encontrado';
 
                                     $rowStatus = (string) ($consumerRow['status'] ?? '');
@@ -239,7 +239,6 @@ if (!empty($lastUsedValues)) {
                                     }
                                     ?>
                                     <tr>
-                                        <td><?php echo (int) ($consumerRow['id'] ?? 0); ?></td>
                                         <td><?php echo esc_html((string) ($consumerRow['consumer_name'] ?? '')); ?></td>
                                         <td><?php echo esc_html($linkedUserLabel); ?></td>
                                         <td><?php echo esc_html((string) ($consumerRow['allowed_services'] ?? '')); ?></td>
@@ -251,42 +250,66 @@ if (!empty($lastUsedValues)) {
                                         <td>
                                             <code><?php echo esc_html((string) ($consumerRow['api_key_prefix'] ?? '')); ?>...</code>
                                         </td>
-                                        <td><?php echo esc_html((string) ($consumerRow['last_used_at'] ?? '—')); ?></td>
-                                        <td><?php echo esc_html((string) ($consumerRow['created_at'] ?? '—')); ?></td>
+
+                                        <?php $ultima_atualicao = $consumerRow['last_used_at'] ? date_i18n('d/m/Y H:i:s', strtotime($consumerRow['last_used_at'])) : '';
+                                        $criado_em = $consumerRow['created_at'] ? date_i18n('d/m/Y H:i:s', strtotime($consumerRow['created_at'])) : '';
+                                        ?>
+
+
+                                        <td><?php echo $ultima_atualicao ?? '—'; ?></td>
+                                        <td><?php echo $criado_em ?? '—'; ?></td>
 
                                         <td>
                                             <div class="acme-api-row-actions">
                                                 <?php if ($rowStatus === 'active') : ?>
-                                                    <form method="post" class="acme-api-inline-form">
-                                                        <?php wp_nonce_field('acme_api_panel', 'acme_api_nonce'); ?>
-                                                        <input type="hidden" name="acme_api_panel_action" value="update_consumer_status">
-                                                        <input type="hidden" name="consumer_id" value="<?php echo (int) ($consumerRow['id'] ?? 0); ?>">
-                                                        <input type="hidden" name="target_status" value="inactive">
-                                                        <button type="submit" class="acme-api-link-button acme-api-link-button-warning">Inativar</button>
-                                                    </form>
-                                                <?php endif; ?>
+    <form method="post" class="acme-api-inline-form" onsubmit="return confirm('Tem certeza que deseja inativar esta chave?');">
+        <?php wp_nonce_field('acme_api_panel', 'acme_api_nonce'); ?>
+        <input type="hidden" name="acme_api_panel_action" value="update_consumer_status">
+        <input type="hidden" name="consumer_id" value="<?php echo (int) ($consumerRow['id'] ?? 0); ?>">
+        <input type="hidden" name="target_status" value="inactive">
+        <button
+            type="submit"
+            class="acme-api-icon-button acme-api-link-button-warning"
+            title="Inativar chave"
+            aria-label="Inativar chave">
+            <span class="dashicons dashicons-hidden" aria-hidden="true"></span>
+        </button>
+    </form>
+<?php endif; ?>
 
-                                                <?php if ($rowStatus === 'inactive') : ?>
-                                                    <form method="post" class="acme-api-inline-form">
-                                                        <?php wp_nonce_field('acme_api_panel', 'acme_api_nonce'); ?>
-                                                        <input type="hidden" name="acme_api_panel_action" value="update_consumer_status">
-                                                        <input type="hidden" name="consumer_id" value="<?php echo (int) ($consumerRow['id'] ?? 0); ?>">
-                                                        <input type="hidden" name="target_status" value="active">
-                                                        <button type="submit" class="acme-api-link-button acme-api-link-button-success">
-                                                            Reativar
-                                                        </button>
-                                                    </form>
-                                                <?php endif; ?>
+<?php if ($rowStatus === 'inactive') : ?>
+    <form method="post" class="acme-api-inline-form" onsubmit="return confirm('Tem certeza que deseja reativar esta chave?');">
+        <?php wp_nonce_field('acme_api_panel', 'acme_api_nonce'); ?>
+        <input type="hidden" name="acme_api_panel_action" value="update_consumer_status">
+        <input type="hidden" name="consumer_id" value="<?php echo (int) ($consumerRow['id'] ?? 0); ?>">
+        <input type="hidden" name="target_status" value="active">
+        <button
+            type="submit"
+            class="acme-api-icon-button acme-api-link-button-success"
+            title="Reativar chave"
+            aria-label="Reativar chave">
+            <span class="dashicons dashicons-yes-alt" aria-hidden="true"></span>
+        </button>
+    </form>
+<?php endif; ?>
 
-                                                <?php if ($rowStatus !== 'revoked') : ?>
-                                                    <form method="post" class="acme-api-inline-form" onsubmit="return confirm('Tem certeza que deseja revogar esta chave?');">
-                                                        <?php wp_nonce_field('acme_api_panel', 'acme_api_nonce'); ?>
-                                                        <input type="hidden" name="acme_api_panel_action" value="update_consumer_status">
-                                                        <input type="hidden" name="consumer_id" value="<?php echo (int) ($consumerRow['id'] ?? 0); ?>">
-                                                        <input type="hidden" name="target_status" value="revoked">
-                                                        <button type="submit" class="acme-api-link-button acme-api-link-button-danger">Revogar</button>
-                                                    </form>
-                                                <?php endif; ?>
+<?php if ($rowStatus !== 'revoked') : ?>
+    <form method="post" class="acme-api-inline-form" onsubmit="return confirm('Tem certeza que deseja revogar esta chave? Essa ação não pode ser desfeita!');">
+        <?php wp_nonce_field('acme_api_panel', 'acme_api_nonce'); ?>
+        <input type="hidden" name="acme_api_panel_action" value="update_consumer_status">
+        <input type="hidden" name="consumer_id" value="<?php echo (int) ($consumerRow['id'] ?? 0); ?>">
+        <input type="hidden" name="target_status" value="revoked">
+        <button
+            type="submit"
+            class="acme-api-icon-button acme-api-link-button-danger"
+            title="Revogar chave"
+            aria-label="Revogar chave">
+            <span class="dashicons dashicons-dismiss" aria-hidden="true"></span>
+        </button>
+    </form>
+<?php endif; ?>
+
+                                               
                                             </div>
                                         </td>
                                     </tr>

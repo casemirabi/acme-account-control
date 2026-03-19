@@ -66,3 +66,4 @@
     initCreditToggle: initCreditToggle
   };
 })();
+
