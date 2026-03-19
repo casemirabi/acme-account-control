@@ -1204,6 +1204,15 @@ if (!function_exists('acme_ui_panel_css')) {
 .acme-badge-failed{background:#fef2f2;color:#b91c1c;border-color:#fecaca}
 .acme-mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:12px;color:#334155}
 .acme-muted{color:#64748b}
+
+/* 🔽 ADICIONE ISSO AQUI */
+.acme-col-error{
+  max-width:250px;
+  white-space:normal;
+  word-break:break-word;
+  overflow-wrap:anywhere;
+}
+
 </style>';
   }
 }

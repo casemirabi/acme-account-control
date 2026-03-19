@@ -1240,8 +1240,10 @@ function acme_shortcode_my_grandchildren_manage($atts = [])
                                 <?php
                                 $childrenForFilter = get_users(['role' => 'child']);
                                 foreach ((array) $childrenForFilter as $childUser) {
+                                    //echo '<option value="' . (int) $childUser->ID . '" ' . selected($filterMaster, (int) $childUser->ID, false) . '>' .
+                                    //esc_html($childUser->display_name) . ' (#' . (int) $childUser->ID . ')</option>';
                                     echo '<option value="' . (int) $childUser->ID . '" ' . selected($filterMaster, (int) $childUser->ID, false) . '>' .
-                                        esc_html($childUser->display_name) . ' (#' . (int) $childUser->ID . ')</option>';
+                                        esc_html($childUser->display_name) . '</option>';
                                 }
                                 ?>
                             </select>
@@ -1374,7 +1376,7 @@ function acme_shortcode_my_grandchildren_manage($atts = [])
 
                         <td>
                             <strong><?php echo esc_html($row->display_name); ?></strong>
-                            <div class="acme-muted" style="font-size:12px;">#<?php echo (int) $row->ID; ?></div>
+                            <!--<div class="acme-muted" style="font-size:12px;">#<?php //echo (int) $row->ID; ?></div>-->
                         </td>
 
                         <td class="acme-muted"><?php echo esc_html($row->phone ?? '—'); ?></td>

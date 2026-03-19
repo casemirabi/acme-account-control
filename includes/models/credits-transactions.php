@@ -670,7 +670,7 @@ if (!function_exists('acme_render_transactions_table')) {
                   ?>
                   <?php if ($user_sel): ?>
                     <option value="<?php echo (int) $uid_sel; ?>" selected>
-                      <?php echo esc_html($user_sel->display_name . ' (#' . $uid_sel . ')'); ?>
+                     <?php echo esc_html($user_sel->display_name); ?> <?php //echo esc_html($user_sel->display_name . ' (#' . $uid_sel . ')'); ?>
                     </option>
                   <?php else: ?>
                     <option value="0">Todos</option>
@@ -681,7 +681,7 @@ if (!function_exists('acme_render_transactions_table')) {
                   <?php endif; ?>
                   <?php foreach ($users as $u): ?>
                     <option value="<?php echo (int) $u->ID; ?>" <?php selected($user_id, (int) $u->ID); ?>>
-                      <?php echo esc_html($u->display_name . ' (#' . $u->ID . ')'); ?>
+                      <?php echo esc_html($u->display_name); ?> <?php //echo esc_html($u->display_name . ' (#' . $u->ID . ')'); ?>
                     </option>
                   <?php endforeach; ?>
                 <?php endif; ?>
