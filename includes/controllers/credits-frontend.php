@@ -55,6 +55,33 @@ if (!function_exists('acme_handle_admin_grant_credits')) {
       wp_die('Serviço inválido (slug não encontrado).');
     }
 
+        // ===== VALIDA STATUS DO USUÁRIO ALVO =====
+    $statusT = acme_table_status();
+
+    $target_status = $wpdb->get_var($wpdb->prepare(
+      "SELECT status
+       FROM {$statusT}
+       WHERE user_id = %d
+       LIMIT 1",
+      $user_id
+    ));
+
+    $target_status = $target_status ? (string) $target_status : 'active';
+
+    if ($target_status !== 'active') {
+      $back = wp_get_referer() ?: admin_url('admin.php?page=acme_credits');
+      $back = remove_query_arg(['acme_msg', 'acme_err'], $back);
+      $back = add_query_arg('acme_msg', 'err', $back);
+      $back = add_query_arg(
+        'acme_err',
+        rawurlencode('Não é possível conceder créditos para usuário inativo.'),
+        $back
+      );
+
+      wp_safe_redirect($back);
+      exit;
+    }
+
     $meta = [
       'source' => is_admin() ? 'wp-admin' : 'front',
       'ip' => $_SERVER['REMOTE_ADDR'] ?? null,

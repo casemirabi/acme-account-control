@@ -104,6 +104,25 @@ function acme_lots_transfer_child_to_grandchild(int $child_id, int $grandchild_i
     return new WP_Error('acme_forbidden', 'Você só pode distribuir para seus próprios Netos.');
   }
 
+
+    // ===== VALIDA STATUS DO USUÁRIO DESTINO =====
+  global $wpdb;
+  $statusT = acme_table_status();
+
+  $target_status = $wpdb->get_var($wpdb->prepare(
+    "SELECT status
+     FROM {$statusT}
+     WHERE user_id = %d
+     LIMIT 1",
+    $grandchild_id
+  ));
+
+  $target_status = $target_status ? (string) $target_status : 'active';
+
+  if ($target_status !== 'active') {
+    return new WP_Error('acme_target_inactive', 'Não é possível distribuir créditos para usuário inativo.');
+  }
+
   global $wpdb;
   $lotsT = acme_table_credit_lots();
   $now = current_time('mysql');
