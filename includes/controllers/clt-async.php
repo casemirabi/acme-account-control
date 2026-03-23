@@ -333,6 +333,7 @@ function acme_api_clt_start(WP_REST_Request $req)
     'service_slug' => 'clt',
     'cpf_hash' => hash('sha256', $cpf),
     'cpf_masked' => acme_mask_cpf($cpf),
+    'numeroDocumento' => $cpf,
     'webhook_url' => $webhook_url,
     'status' => 'pending',
     'created_at' => current_time('mysql'),

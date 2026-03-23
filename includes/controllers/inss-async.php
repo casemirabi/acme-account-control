@@ -412,7 +412,7 @@ function acme_api_inss_start(WP_REST_Request $req)
       'status'              => 'pending',
       'created_at'          => current_time('mysql'),
       'updated_at'          => current_time('mysql'),
-      'cpf'                 => $beneficio,
+      'numeroDocumento'                 => $beneficio,
 
     ]
   );
