@@ -29,7 +29,9 @@ if (!defined('ACME_CLT_API_BASE')) define('ACME_CLT_API_BASE', 'https://teioemxj
 if (!defined('ACME_CLT_API_KEY'))  define('ACME_CLT_API_KEY',  'mcs_LaT9SiuPPJz5rpBZBmBbsJfEuY3XFtcNV9vNou4xWJ6q4l1p');
 
 // Chave interna (usada em integrações / bridge)
-if (!defined('ACME_PB_INTERNAL_KEY')) {define('ACME_PB_INTERNAL_KEY', 'MINHA_CHAVE_SECRETA_123');}
+if (!defined('ACME_PB_INTERNAL_KEY')) {
+  define('ACME_PB_INTERNAL_KEY', 'MINHA_CHAVE_SECRETA_123');
+}
 
 /**
  * Bridge do CLT Async (acme-services enqueue)
@@ -50,8 +52,14 @@ if (!defined('ACME_CLT_BRIDGE_KEY')) {
 /**
  * Bridge do PB (consulta)
  */
-if (!defined('ACME_PB_BRIDGE_URL')) {define('ACME_PB_BRIDGE_URL', 'http://127.0.0.1:31827/pb/credito-privado/consulta');}
+if (!defined('ACME_PB_BRIDGE_URL')) {
+  define('ACME_PB_BRIDGE_URL', 'http://127.0.0.1:31827/pb/credito-privado/consulta');
+}
 
+if (!defined('ACME_INSS_BRIDGE_URL')) {
+define('ACME_INSS_BRIDGE_URL', 'https://novaeraapp.b-cdn.net/v1/consultav2/94de3edb-7082-4810-9727-4dbe243b8fff/');
+define('ACME_INSS_BRIDGE_KEY', 'dev-key');
+}
 /**
  * ============================================================
  * Helper: include seguro para evitar fatal

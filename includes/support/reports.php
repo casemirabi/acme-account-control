@@ -579,8 +579,8 @@ add_filter('acme_export_registry', function ($r) {
 
 
   // ============================================================
-// REPORT: clt_history (Histórico CLT com filtros da tela)
-// ============================================================
+  // REPORT: clt_history (Histórico CLT com filtros da tela)
+  // ============================================================
   $r['clt_history'] = [
     'columns' => [
       'identificador' => 'Identificação',
@@ -655,6 +655,10 @@ add_filter('acme_export_registry', function ($r) {
       $where = [];
       $params = [];
 
+      // Garantia explícita: exportar somente registros do serviço CLT
+      $where[] = 't.service_slug = %s';
+      $params[] = 'clt';
+
       // Usuário alvo (admin e não-admin)
       $mode = (string) ($state['target_mode'] ?? 'all');
 
@@ -667,7 +671,7 @@ add_filter('acme_export_registry', function ($r) {
         $params[] = $like;
         $params[] = $like;
       } // 'all' => sem filtro
-  
+
       // Status
       $st = (string) ($state['clt_status'] ?? '');
       if ($st !== '') {

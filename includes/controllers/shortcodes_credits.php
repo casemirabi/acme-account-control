@@ -1600,6 +1600,10 @@ add_shortcode('acme_clt_panel', function () {
   $where = [];
   $params = [];
 
+  // Garantia explícita: este painel mostra somente requisições do serviço CLT
+  $where[] = 't.service_slug = %s';
+  $params[] = 'clt';
+
   // Usuário normal: sempre vê só o dele
   if (!$is_admin) {
     $where[] = 't.user_id = %d';
@@ -2686,6 +2690,46 @@ function acme_shortcode_grant_credits()
   </div>
 </div>
 
+<?php
+  return ob_get_clean();
+}
+
+
+/**
+ * Novo serviço: INSS 
+ */
+
+add_shortcode('acme_inss_form', 'acme_shortcode_inss_form');
+
+function acme_shortcode_inss_form()
+{
+  ob_start();
+?>
+  <div class="acme-card acme-inss-shell">
+    <div class="acme-card-h">
+      <div>
+        <div class="acme-title">Consulta INSS</div>
+        <div class="acme-muted">Consulte benefício, margem e contratos do INSS.</div>
+      </div>
+    </div>
+
+    <div class="acme-card-b">
+      <div class="acme-inss-form">
+        <div class="acme-inss-form-row">
+          <input
+            type="text"
+            class="acme-inss-beneficio"
+            placeholder="Digite o número do benefício" />
+
+          <button type="button" class="acme-btn acme-inss-submit">
+            Consultar INSS
+          </button>
+        </div>
+
+        <div class="acme-inss-result"></div>
+      </div>
+    </div>
+  </div>
 <?php
   return ob_get_clean();
 }

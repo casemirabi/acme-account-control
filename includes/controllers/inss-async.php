@@ -1,475 +1,782 @@
 <?php
-if (!defined('ABSPATH')) exit;
+if (!defined('ABSPATH')) {
+  exit;
+}
 
 /**
  * ============================================================
- * ACME INSS — Extrato Online + Queue
- * - POST /wp-json/acme/v1/api-inss-extrato-online
- * - POST /wp-json/acme/v1/api-inss-queue-request
+ * ACME INSS Async
+ * Endpoints:
+ * - POST /wp-json/acme/v1/api-inss
  * - GET  /wp-json/acme/v1/api-inss-status?request_id=...
- * - POST /wp-json/acme/v1/inss-webhook
  *
- * Observações:
- * - Extrato Online só 09:00–18:00 (Brasília)
- * - PDF vem em base64
- * - 1 crédito (service_slug = "extrato") por consulta bem-sucedida
- * - Queue reserva crédito no agendamento; no webhook, se falhar, estorna.
+ * Regras:
+ * - Sem tabela própria
+ * - Reutiliza {$wpdb->prefix}clt_requests
+ * - Identifica requests do INSS por service_slug = 'inss'
+ * - Campo de entrada: numero do beneficio
+ * - Crédito validado pelo serviço "inss"
+ * - Débito de crédito fica para a finalização real (webhook/provider)
  * ============================================================
  */
 
-if (!defined('ACME_INSS_API_BASE')) define('ACME_INSS_API_BASE', 'https://teioemxjgepzvpcpevyi.supabase.co/functions/v1');
-if (!defined('ACME_INSS_API_KEY'))  define('ACME_INSS_API_KEY',  ACME_CLT_API_KEY); // reaproveita, se for a mesma
-
 add_action('rest_api_init', function () {
-
-  register_rest_route('acme/v1', '/api-inss-extrato-online', [
-    'methods' => 'POST',
-    'callback' => 'acme_api_inss_extrato_online',
-    'permission_callback' => '__return_true',
-  ]);
-
-  register_rest_route('acme/v1', '/api-inss-queue-request', [
-    'methods' => 'POST',
-    'callback' => 'acme_api_inss_queue_request',
+  register_rest_route('acme/v1', '/api-inss', [
+    'methods'  => 'POST',
+    'callback' => 'acme_api_inss_start',
     'permission_callback' => '__return_true',
   ]);
 
   register_rest_route('acme/v1', '/api-inss-status', [
-    'methods' => 'GET',
+    'methods'  => 'GET',
     'callback' => 'acme_api_inss_status',
-    'permission_callback' => '__return_true',
-  ]);
-
-  register_rest_route('acme/v1', '/inss-webhook', [
-    'methods' => 'POST',
-    'callback' => 'acme_api_inss_webhook',
     'permission_callback' => '__return_true',
   ]);
 });
 
-function acme_inss_requests_table(): string {
-  global $wpdb;
-  return $wpdb->prefix . 'inss_requests';
-}
+add_action('rest_api_init', function () {
+  /*register_rest_route('acme/v1', '/inss-simulate-success', [
+    'methods'  => 'POST',
+    'callback' => 'acme_inss_simulate_success',
+    'permission_callback' => function () {
+      return current_user_can('manage_options');
+    },
+  ]);*/
+  register_rest_route('acme/v1', '/inss-simulate-success', [
+    'methods'  => 'POST',
+    'callback' => 'acme_inss_simulate_success',
+    'permission_callback' => function (WP_REST_Request $req) {
+      $currentUserId = (int) get_current_user_id();
 
-/** Criação da tabela INSS */
-function acme_inss_activate() {
-  global $wpdb;
-  require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+      if ($currentUserId > 0 && user_can($currentUserId, 'manage_options')) {
+        return true;
+      }
 
-  $t = acme_inss_requests_table();
-  $charset = $wpdb->get_charset_collate();
+      $apiKey = (string) $req->get_header('x-acme-key');
+      if ($apiKey !== '' && function_exists('acme_validate_api_key')) {
+        $consumerData = acme_validate_api_key($apiKey, 'inss');
 
-  $sql = "CREATE TABLE {$t} (
-    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-    user_id BIGINT UNSIGNED NOT NULL,
-    request_id VARCHAR(64) NOT NULL,            -- inss_xxx (interno)
-    provider_request_id VARCHAR(80) NULL,       -- uuid retornado pelo /api-queue-request
-    beneficio_hash CHAR(64) NOT NULL,
-    beneficio_masked VARCHAR(20) NOT NULL,
-    webhook_url VARCHAR(255) NULL,
-    kind ENUM('online','queue') NOT NULL DEFAULT 'online',
-    status ENUM('pending','completed','failed') NOT NULL DEFAULT 'pending',
-    response_json LONGTEXT NULL,
-    error_code VARCHAR(60) NULL,
-    error_message VARCHAR(255) NULL,
-    created_at DATETIME NOT NULL,
-    updated_at DATETIME NOT NULL,
-    completed_at DATETIME NULL,
-    PRIMARY KEY (id),
-    UNIQUE KEY uniq_request_id (request_id),
-    KEY idx_user (user_id),
-    KEY idx_status (status),
-    KEY idx_provider (provider_request_id)
-  ) {$charset};";
+        if (!is_wp_error($consumerData)) {
+          $apiUserId = (int) ($consumerData['wp_user_id'] ?? 0);
 
-  dbDelta($sql);
-}
-
-/** Horário Brasília 09:00–18:00 */
-function acme_inss_is_open_now(): bool {
-  $tz = new DateTimeZone('America/Sao_Paulo');
-  $now = new DateTime('now', $tz);
-  $h = (int)$now->format('H');
-  return ($h >= 9 && $h < 18);
-}
-
-function acme_inss_mask_beneficio(string $nb): string {
-  $nb = preg_replace('/\D+/', '', $nb);
-  if (strlen($nb) <= 4) return str_repeat('*', max(0, strlen($nb)));
-  return str_repeat('*', strlen($nb) - 4) . substr($nb, -4);
-}
-
-function acme_inss_new_request_id(): string {
-  return 'inss_' . wp_generate_password(18, false, false);
-}
-
-function acme_inss_webhook_url(): string {
-  return rest_url('acme/v1/inss-webhook');
-}
-
-/** HTTP helper */
-function acme_inss_http_post_json(string $path, array $body): array {
-  $url = rtrim(ACME_INSS_API_BASE, '/') . '/' . ltrim($path, '/');
-
-  $args = [
-    'timeout' => 30,
-    'headers' => [
-      'Content-Type' => 'application/json',
-      'x-api-key' => ACME_INSS_API_KEY,
-    ],
-    'body' => wp_json_encode($body, JSON_UNESCAPED_UNICODE),
-  ];
-
-  $res = wp_remote_post($url, $args);
-
-  if (is_wp_error($res)) {
-    return ['ok' => false, 'http_error' => $res->get_error_message()];
-  }
-
-  $code = (int) wp_remote_retrieve_response_code($res);
-  $raw  = (string) wp_remote_retrieve_body($res);
-  $json = json_decode($raw, true);
-
-  if (!is_array($json)) $json = ['raw' => $raw];
-
-  return ['ok' => ($code >= 200 && $code < 300), 'http_code' => $code, 'json' => $json];
-}
-
-/** Estorno (se a fila falhar depois de reservar crédito) */
-function acme_inss_refund_credit_by_request_id(string $request_id): void {
-  global $wpdb;
-
-  $txT   = $wpdb->prefix . 'credit_transactions';
-  $lotsT = $wpdb->prefix . 'credit_lots';
-  $ctT   = $wpdb->prefix . 'credit_contracts';
-
-  $tx = $wpdb->get_row($wpdb->prepare(
-    "SELECT * FROM {$txT} WHERE request_id=%s AND type='debit' AND status='success' ORDER BY id DESC LIMIT 1",
-    $request_id
-  ), ARRAY_A);
-
-  if (!$tx) return;
-
-  $meta = [];
-  if (!empty($tx['meta'])) {
-    $m = json_decode($tx['meta'], true);
-    if (is_array($m)) $meta = $m;
-  }
-
-  $lot_id = (int)($meta['lot_id'] ?? 0);
-  $amount = max(1, (int)($tx['credits'] ?? 1));
-
-  if ($lot_id <= 0) return;
-
-  $wpdb->query('START TRANSACTION');
-  try {
-    $lot = $wpdb->get_row($wpdb->prepare(
-      "SELECT id, contract_id, credits_used FROM {$lotsT} WHERE id=%d LIMIT 1 FOR UPDATE",
-      $lot_id
-    ), ARRAY_A);
-
-    if ($lot) {
-      $used = max(0, (int)$lot['credits_used'] - $amount);
-      $ok = $wpdb->update($lotsT, ['credits_used' => $used, 'updated_at' => current_time('mysql')], ['id' => $lot_id]);
-      if ($ok === false) throw new Exception($wpdb->last_error);
-
-      $contract_id = (int)($lot['contract_id'] ?? 0);
-      if ($contract_id > 0) {
-        $c = $wpdb->get_row($wpdb->prepare(
-          "SELECT id, credits_used FROM {$ctT} WHERE id=%d LIMIT 1 FOR UPDATE",
-          $contract_id
-        ), ARRAY_A);
-
-        if ($c) {
-          $c_used = max(0, (int)$c['credits_used'] - $amount);
-          $okc = $wpdb->update($ctT, ['credits_used' => $c_used, 'updated_at' => current_time('mysql')], ['id' => $contract_id]);
-          if ($okc === false) throw new Exception($wpdb->last_error);
+          if ($apiUserId > 0 && user_can($apiUserId, 'manage_options')) {
+            return true;
+          }
         }
       }
 
-      // Log de estorno
-      $wpdb->insert($txT, [
-        'user_id' => (int)$tx['user_id'],
-        'service_id' => (int)$tx['service_id'],
-        'service_slug' => $tx['service_slug'],
-        'service_name' => $tx['service_name'],
-        'type' => 'credit',
-        'credits' => $amount,
-        'status' => 'success',
-        'attempts' => 1,
-        'request_id' => $request_id,
-        'actor_user_id' => get_current_user_id(),
-        'notes' => 'Estorno automático (INSS queue falhou)',
-        'meta' => wp_json_encode(['refund_of_tx' => (int)$tx['id'], 'lot_id' => $lot_id]),
-        'created_at' => current_time('mysql'),
-        'wallet_total_before' => 0,
-        'wallet_used_before' => 0,
-        'wallet_total_after' => 0,
-        'wallet_used_after' => 0,
-      ]);
-    }
-
-    $wpdb->query('COMMIT');
-  } catch (Exception $e) {
-    $wpdb->query('ROLLBACK');
-  }
-}
-
-/** POST /api-inss-extrato-online */
-function acme_api_inss_extrato_online(WP_REST_Request $req) {
-  global $wpdb;
-
-  $user_id = get_current_user_id();
-  $beneficio = (string)($req->get_param('beneficio') ?? '');
-  $beneficio = preg_replace('/\D+/', '', $beneficio);
-
-  if (!$beneficio) return new WP_REST_Response(['success' => false, 'code' => 'MISSING_BENEFICIO', 'error' => 'beneficio obrigatório'], 400);
-
-  if (!acme_inss_is_open_now()) {
-    return new WP_REST_Response([
-      'success' => false,
-      'code' => 'OUT_OF_BUSINESS_HOURS',
-      'error' => 'Fora do horário (09:00–18:00 Brasília). Use /api-inss-queue-request para agendar.'
-    ], 403);
-  }
-
-  // 1 crédito por sucesso (service_slug = extrato)
-  if (!acme_user_has_credit($user_id, 'extrato')) {
-    return new WP_REST_Response(['success' => false, 'code' => 'NO_CREDITS', 'error' => 'Sem créditos'], 402);
-  }
-
-  $rid = acme_inss_new_request_id();
-  $t = acme_inss_requests_table();
-  $now = current_time('mysql');
-
-  $wpdb->insert($t, [
-    'user_id' => (int)$user_id,
-    'request_id' => $rid,
-    'provider_request_id' => null,
-    'beneficio_hash' => hash('sha256', $beneficio),
-    'beneficio_masked' => acme_inss_mask_beneficio($beneficio),
-    'webhook_url' => null,
-    'kind' => 'online',
-    'status' => 'pending',
-    'created_at' => $now,
-    'updated_at' => $now,
+      return new WP_Error(
+        'rest_forbidden',
+        'Sem permissão para fazer isso.',
+        ['status' => 401]
+      );
+    },
   ]);
 
-  $http = acme_inss_http_post_json('/api-extrato-online', ['beneficio' => $beneficio]);
+  /*register_rest_route('acme/v1', '/inss-simulate-fail', [
+    'methods'  => 'POST',
+    'callback' => 'acme_inss_simulate_fail',
+    'permission_callback' => function () {
+      return current_user_can('manage_options');
+    },
+  ]);*/
+  register_rest_route('acme/v1', '/inss-simulate-fail', [
+    'methods'  => 'POST',
+    'callback' => 'acme_inss_simulate_fail',
+    'permission_callback' => function (WP_REST_Request $req) {
+      $currentUserId = (int) get_current_user_id();
 
-  if (!$http['ok']) {
-    $wpdb->update($t, [
-      'status' => 'failed',
-      'error_code' => 'HTTP_ERROR',
-      'error_message' => $http['http_error'] ?? ('HTTP ' . ($http['http_code'] ?? 'ERR')),
-      'response_json' => wp_json_encode($http['json'] ?? [], JSON_UNESCAPED_UNICODE),
-      'updated_at' => current_time('mysql'),
-      'completed_at' => current_time('mysql'),
-    ], ['request_id' => $rid]);
+      if ($currentUserId > 0 && user_can($currentUserId, 'manage_options')) {
+        return true;
+      }
 
-    return new WP_REST_Response(['success' => false, 'code' => 'PROVIDER_ERROR', 'error' => 'Falha ao consultar fornecedor', 'request_id' => $rid], 502);
-  }
+      $apiKey = (string) $req->get_header('x-acme-key');
+      if ($apiKey !== '' && function_exists('acme_validate_api_key')) {
+        $consumerData = acme_validate_api_key($apiKey, 'inss');
 
-  $payload = $http['json'];
-  $ok = !empty($payload['success']);
+        if (!is_wp_error($consumerData)) {
+          $apiUserId = (int) ($consumerData['wp_user_id'] ?? 0);
 
-  if (!$ok) {
-    $wpdb->update($t, [
-      'status' => 'failed',
-      'error_code' => (string)($payload['code'] ?? 'PROVIDER_FAIL'),
-      'error_message' => (string)($payload['error'] ?? 'Falha'),
-      'response_json' => wp_json_encode($payload, JSON_UNESCAPED_UNICODE),
-      'updated_at' => current_time('mysql'),
-      'completed_at' => current_time('mysql'),
-    ], ['request_id' => $rid]);
+          if ($apiUserId > 0 && user_can($apiUserId, 'manage_options')) {
+            return true;
+          }
+        }
+      }
 
-    return new WP_REST_Response(['success' => false, 'code' => ($payload['code'] ?? 'PROVIDER_FAIL'), 'error' => ($payload['error'] ?? 'Falha'), 'request_id' => $rid], 200);
-  }
+      return new WP_Error(
+        'rest_forbidden',
+        'Sem permissão para fazer isso.',
+        ['status' => 401]
+      );
+    },
+  ]);
+});
 
-  // Debita crédito SOMENTE no sucesso
-  $debit = acme_consume_credit((int)$user_id, 'extrato', 1, $rid, 'Extrato');
-
-  if (empty($debit['ok'])) {
-    // Se não conseguiu debitar, marca falha interna
-    $wpdb->update($t, [
-      'status' => 'failed',
-      'error_code' => 'CREDIT_DEBIT_FAIL',
-      'error_message' => (string)($debit['error'] ?? 'Falha ao debitar'),
-      'response_json' => wp_json_encode($payload, JSON_UNESCAPED_UNICODE),
-      'updated_at' => current_time('mysql'),
-      'completed_at' => current_time('mysql'),
-    ], ['request_id' => $rid]);
-
-    return new WP_REST_Response(['success' => false, 'code' => 'CREDIT_DEBIT_FAIL', 'error' => 'Falha ao debitar crédito', 'request_id' => $rid], 500);
-  }
-
-  $wpdb->update($t, [
-    'status' => 'completed',
-    'response_json' => wp_json_encode($payload, JSON_UNESCAPED_UNICODE),
-    'updated_at' => current_time('mysql'),
-    'completed_at' => current_time('mysql'),
-    'error_code' => null,
-    'error_message' => null,
-  ], ['request_id' => $rid]);
-
-  // retorna o payload (já vem com pdf_base64)
-  $payload['request_id'] = $rid;
-  return new WP_REST_Response($payload, 200);
-}
-
-/** POST /api-inss-queue-request */
-function acme_api_inss_queue_request(WP_REST_Request $req) {
+function acme_inss_simulate_success(WP_REST_Request $req)
+{
   global $wpdb;
 
-  $user_id = get_current_user_id();
-  $beneficio = (string)($req->get_param('beneficio') ?? '');
-  $beneficio = preg_replace('/\D+/', '', $beneficio);
-
-  if (!$beneficio) return new WP_REST_Response(['success' => false, 'code' => 'MISSING_BENEFICIO', 'error' => 'beneficio obrigatório'], 400);
-
-  if (!acme_user_has_credit($user_id, 'extrato')) {
-    return new WP_REST_Response(['success' => false, 'code' => 'NO_CREDITS', 'error' => 'Sem créditos'], 402);
+  $requestId = (string) ($req->get_param('request_id') ?? '');
+  if ($requestId === '') {
+    return acme_err(400, 'request_id obrigatório', 'MISSING_REQUEST_ID');
   }
 
-  $rid = acme_inss_new_request_id();
-  $t = acme_inss_requests_table();
-  $now = current_time('mysql');
+  $requestsTable = $wpdb->prefix . 'clt_requests';
 
-  // Reserva crédito já no agendamento (como a doc pede)
-  $debit = acme_consume_credit((int)$user_id, 'extrato', 1, $rid, 'Extrato');
-  if (empty($debit['ok'])) {
-    return new WP_REST_Response(['success' => false, 'code' => 'CREDIT_DEBIT_FAIL', 'error' => ($debit['error'] ?? 'Falha ao reservar crédito')], 500);
+  $row = $wpdb->get_row(
+    $wpdb->prepare(
+      "SELECT * FROM {$requestsTable}
+       WHERE request_id = %s
+         AND service_slug = %s
+       LIMIT 1",
+      $requestId,
+      'inss'
+    ),
+    ARRAY_A
+  );
+
+  if (!$row) {
+    return acme_err(404, 'Requisição INSS não encontrada', 'NOT_FOUND');
   }
 
-  $webhook = acme_inss_webhook_url();
-
-  $wpdb->insert($t, [
-    'user_id' => (int)$user_id,
-    'request_id' => $rid,
-    'provider_request_id' => null,
-    'beneficio_hash' => hash('sha256', $beneficio),
-    'beneficio_masked' => acme_inss_mask_beneficio($beneficio),
-    'webhook_url' => $webhook,
-    'kind' => 'queue',
-    'status' => 'pending',
-    'created_at' => $now,
-    'updated_at' => $now,
-  ]);
-
-  $http = acme_inss_http_post_json('/api-queue-request', [
-    'beneficio' => $beneficio,
-    'webhook_url' => $webhook,
-  ]);
-
-  if (!$http['ok'] || empty($http['json']['success'])) {
-    // se falhou agendar, estorna imediatamente (não ficou “reservado” de verdade)
-    acme_inss_refund_credit_by_request_id($rid);
-
-    $wpdb->update($t, [
-      'status' => 'failed',
-      'error_code' => (string)($http['json']['code'] ?? 'QUEUE_FAIL'),
-      'error_message' => (string)($http['json']['error'] ?? $http['http_error'] ?? 'Falha ao agendar'),
-      'response_json' => wp_json_encode($http['json'] ?? [], JSON_UNESCAPED_UNICODE),
-      'updated_at' => current_time('mysql'),
-      'completed_at' => current_time('mysql'),
-    ], ['request_id' => $rid]);
-
-    return new WP_REST_Response(['success' => false, 'code' => 'QUEUE_FAIL', 'error' => 'Falha ao adicionar na fila', 'request_id' => $rid], 502);
-  }
-
-  $provider_id = (string)($http['json']['request_id'] ?? '');
-
-  $wpdb->update($t, [
-    'provider_request_id' => $provider_id ?: null,
-    'response_json' => wp_json_encode($http['json'], JSON_UNESCAPED_UNICODE),
-    'updated_at' => current_time('mysql'),
-  ], ['request_id' => $rid]);
-
-  $out = $http['json'];
-  $out['internal_request_id'] = $rid;
-  return new WP_REST_Response($out, 200);
-}
-
-/** GET /api-inss-status */
-function acme_api_inss_status(WP_REST_Request $req) {
-  global $wpdb;
-  $rid = (string)($req->get_param('request_id') ?? '');
-  if (!$rid) return new WP_REST_Response(['success' => false, 'code' => 'MISSING_REQUEST_ID', 'error' => 'request_id obrigatório'], 400);
-
-  $t = acme_inss_requests_table();
-  $row = $wpdb->get_row($wpdb->prepare("SELECT * FROM {$t} WHERE request_id=%s LIMIT 1", $rid), ARRAY_A);
-
-  if (!$row) return new WP_REST_Response(['success' => false, 'code' => 'NOT_FOUND', 'error' => 'Requisição não encontrada'], 404);
-
-  $payload = [
-    'success' => true,
-    'request_id' => $row['request_id'],
-    'provider_request_id' => $row['provider_request_id'],
-    'kind' => $row['kind'],
-    'status' => $row['status'],
-    'error' => $row['error_message'],
-    'code' => $row['error_code'],
+  $fakePayload = [
+    'dados' => [
+      'beneficio' => '2279067549',
+      'nome' => 'JOAO MARIA ALVES MEIRELES',
+      'especie' => [
+        'codigo' => 41,
+        'descricao' => 'APOSENTADORIA POR IDADE',
+      ],
+      'situacao' => 'ATIVO',
+      'bloqueioEmprestimo' => true,
+      'motivoBloqueio' => 'Bloqueado pelo segurado',
+      'elegivelEmprestimo' => true,
+      'possuiProcurador' => false,
+      'possuiRepresentante' => false,
+      'pensaoAlimenticia' => false,
+      'meioPagamento' => 'Conta Corrente',
+      'banco' => [
+        'codigo' => '104',
+        'descricao' => 'CAIXA ECONOMICA FEDERAL',
+      ],
+      'agencia' => '25',
+      'conta' => '7319443555',
+      'valorBase' => 1621,
+      'margemConsignavel' => 567.35,
+      'margemUtilizadaEmprestimo' => 475.35,
+      'margemDisponivelEmprestimo' => 81.05,
+      'contratosEmprestimo' => [
+        [
+          'contrato' => '0266540545JMA',
+          'banco' => [
+            'codigo' => '753',
+            'descricao' => 'NOVO BANCO CONTINENTAL S A',
+          ],
+          'quantidadeParcelas' => 96,
+          'valorEmprestado' => 20695.71,
+          'valorLiberado' => 20000,
+          'valorParcela' => 475.35,
+          'cetAnual' => 26.43,
+          'taxaAnual' => 24.6,
+          'taxaMensal' => 1.85,
+          'iof' => 695.71,
+          'situacao' => 'Ativo',
+        ],
+      ],
+      'contratosRMC' => [],
+      'contratosRCC' => [],
+    ],
   ];
 
-  if (!empty($row['response_json'])) {
-    $j = json_decode($row['response_json'], true);
-    if (is_array($j)) $payload['provider_response'] = $j;
-  }
-
-  return new WP_REST_Response($payload, 200);
-}
-
-/** POST /inss-webhook (resultado da fila) */
-function acme_api_inss_webhook(WP_REST_Request $req) {
-  global $wpdb;
-
-  // Aceita tanto internal_request_id quanto provider_request_id, pra ser robusto
-  $internal = (string)($req->get_param('internal_request_id') ?? $req->get_param('request_id') ?? '');
-  $provider = (string)($req->get_param('provider_request_id') ?? '');
-
-  $t = acme_inss_requests_table();
-
-  $row = null;
-  if ($internal) {
-    $row = $wpdb->get_row($wpdb->prepare("SELECT * FROM {$t} WHERE request_id=%s LIMIT 1", $internal), ARRAY_A);
-  }
-  if (!$row && $provider) {
-    $row = $wpdb->get_row($wpdb->prepare("SELECT * FROM {$t} WHERE provider_request_id=%s LIMIT 1", $provider), ARRAY_A);
-  }
-
-  if (!$row) return new WP_REST_Response(['success' => false, 'code' => 'NOT_FOUND', 'error' => 'Request não encontrada'], 404);
-
-  $payload = $req->get_json_params();
-  if (!is_array($payload)) $payload = [];
-
-  $ok = !empty($payload['success']);
-  $rid = (string)$row['request_id'];
-
-  if ($ok) {
-    $wpdb->update($t, [
+  $updated = $wpdb->update(
+    $requestsTable,
+    [
       'status' => 'completed',
-      'response_json' => wp_json_encode($payload, JSON_UNESCAPED_UNICODE),
+      'response_json' => wp_json_encode($fakePayload, JSON_UNESCAPED_UNICODE),
+      'completed_at' => current_time('mysql'),
+      'updated_at' => current_time('mysql'),
       'error_code' => null,
       'error_message' => null,
-      'updated_at' => current_time('mysql'),
-      'completed_at' => current_time('mysql'),
-    ], ['request_id' => $rid]);
+    ],
+    [
+      'request_id' => $requestId,
+      'service_slug' => 'inss',
+    ]
+  );
 
-    return new WP_REST_Response(['success' => true, 'request_id' => $rid, 'status' => 'completed'], 200);
+  if ($updated === false) {
+    return acme_err(500, 'Falha ao finalizar requisição INSS.', 'DB_UPDATE_ERROR');
   }
 
-  // Falhou: estorna (porque na fila o crédito foi reservado no agendamento)
-  acme_inss_refund_credit_by_request_id($rid);
+  return acme_ok([
+    'success' => true,
+    'request_id' => $requestId,
+    'status' => 'completed',
+  ], 200);
+}
 
-  $wpdb->update($t, [
+function acme_inss_simulate_fail(WP_REST_Request $req)
+{
+  global $wpdb;
+
+  $requestId = (string) ($req->get_param('request_id') ?? '');
+  if ($requestId === '') {
+    return acme_err(400, 'request_id obrigatório', 'MISSING_REQUEST_ID');
+  }
+
+  $requestsTable = $wpdb->prefix . 'clt_requests';
+
+  $row = $wpdb->get_row(
+    $wpdb->prepare(
+      "SELECT * FROM {$requestsTable}
+       WHERE request_id = %s
+         AND service_slug = %s
+       LIMIT 1",
+      $requestId,
+      'inss'
+    ),
+    ARRAY_A
+  );
+
+  if (!$row) {
+    return acme_err(404, 'Requisição INSS não encontrada', 'NOT_FOUND');
+  }
+
+  $updated = $wpdb->update(
+    $requestsTable,
+    [
+      'status' => 'failed',
+      'error_code' => 'SIMULATED_FAIL',
+      'error_message' => 'Falha simulada da consulta INSS.',
+      'completed_at' => current_time('mysql'),
+      'updated_at' => current_time('mysql'),
+    ],
+    [
+      'request_id' => $requestId,
+      'service_slug' => 'inss',
+    ]
+  );
+
+  if ($updated === false) {
+    return acme_err(500, 'Falha ao atualizar requisição INSS.', 'DB_UPDATE_ERROR');
+  }
+
+  return acme_ok([
+    'success' => true,
+    'request_id' => $requestId,
     'status' => 'failed',
-    'response_json' => wp_json_encode($payload, JSON_UNESCAPED_UNICODE),
-    'error_code' => (string)($payload['code'] ?? 'FAILED'),
-    'error_message' => (string)($payload['error'] ?? 'Falhou'),
-    'updated_at' => current_time('mysql'),
-    'completed_at' => current_time('mysql'),
-  ], ['request_id' => $rid]);
+  ], 200);
+}
 
-  return new WP_REST_Response(['success' => false, 'request_id' => $rid, 'status' => 'failed'], 200);
+/* ============================================================
+ * Helpers
+ * ============================================================
+ */
+
+
+if (!function_exists('acme_ok')) {
+  function acme_ok($data, int $status = 200)
+  {
+    return new WP_REST_Response($data, $status);
+  }
+}
+
+if (!function_exists('acme_err')) {
+  function acme_err(int $status, string $message, string $code = 'ERROR', array $extra = [])
+  {
+    return new WP_REST_Response(array_merge([
+      'success' => false,
+      'error' => [
+        'code' => $code,
+        'message' => $message,
+      ],
+    ], $extra), $status);
+  }
+}
+
+if (!function_exists('acme_make_inss_request_id')) {
+  function acme_make_inss_request_id(): string
+  {
+    return 'inss_' . substr(md5(uniqid('', true)), 0, 12);
+  }
+}
+
+if (!function_exists('acme_mask_beneficio')) {
+  function acme_mask_beneficio(string $beneficio): string
+  {
+    $beneficio = preg_replace('/\D+/', '', $beneficio);
+
+    if ($beneficio === '') {
+      return '';
+    }
+
+    if (strlen($beneficio) <= 4) {
+      return str_repeat('*', strlen($beneficio));
+    }
+
+    return str_repeat('*', strlen($beneficio) - 4) . substr($beneficio, -4);
+  }
+}
+
+if (!function_exists('acme_resolve_authenticated_user_id')) {
+  function acme_resolve_authenticated_user_id(WP_REST_Request $req): int
+  {
+    $userId = (int) get_current_user_id();
+    if ($userId > 0) {
+      return $userId;
+    }
+
+    $apiKey = (string) $req->get_header('x-acme-key');
+    if ($apiKey !== '' && function_exists('acme_validate_api_key')) {
+      $consumerData = acme_validate_api_key($apiKey, 'inss');
+
+      if (!is_wp_error($consumerData)) {
+        return (int) ($consumerData['wp_user_id'] ?? 0);
+      }
+    }
+
+    return 0;
+  }
+}
+
+/* ============================================================
+ * POST /api-inss
+ * ============================================================
+ */
+
+function acme_api_inss_start(WP_REST_Request $req)
+{
+  global $wpdb;
+
+  $params = $req->get_json_params();
+  if (!is_array($params)) {
+    $params = [];
+  }
+
+  $beneficio = preg_replace('/\D+/', '', (string) ($params['beneficio'] ?? ''));
+
+  if ($beneficio === '') {
+    return acme_err(400, 'Número do benefício obrigatório.', 'INVALID_BENEFICIO');
+  }
+
+  $userId = (int) get_current_user_id();
+
+  if ($userId <= 0) {
+    $userId = acme_resolve_authenticated_user_id($req);
+  }
+
+  if ($userId <= 0) {
+    return acme_err(401, 'Você precisa estar logado ou informar uma API key válida.', 'NOT_AUTHENTICATED');
+  }
+
+  if (function_exists('acme_user_has_credit') && !acme_user_has_credit($userId, 'inss')) {
+    return acme_err(402, 'Sem créditos', 'NO_CREDITS');
+  }
+
+  $inssBaseUrl = '';
+
+  if (defined('ACME_INSS_API_BASE') && trim((string) ACME_INSS_API_BASE) !== '') {
+    $inssBaseUrl = trim((string) ACME_INSS_API_BASE);
+  } elseif (defined('ACME_INSS_BRIDGE_URL') && trim((string) ACME_INSS_BRIDGE_URL) !== '') {
+    $inssBaseUrl = trim((string) ACME_INSS_BRIDGE_URL);
+  }
+
+  if ($inssBaseUrl === '') {
+    return acme_err(500, 'API do fornecedor INSS não configurada.', 'INSS_API_NOT_CONFIGURED');
+  }
+
+  $requestId = acme_make_inss_request_id();
+  $requestsTable = $wpdb->prefix . 'clt_requests';
+
+  $serviceId = function_exists('acme_get_service_id_by_slug')
+    ? (int) acme_get_service_id_by_slug('inss')
+    : 0;
+
+  $userCredits = ($serviceId > 0 && function_exists('acme_credit_balance_user'))
+    ? (int) acme_credit_balance_user($userId, $serviceId)
+    : 0;
+
+  $providerUrl = rtrim($inssBaseUrl, '/') . '/' . rawurlencode($beneficio);
+
+  $inserted = $wpdb->insert(
+    $requestsTable,
+    [
+      'user_id'             => $userId,
+      'request_id'          => $requestId,
+      'clt_request_id'      => wp_generate_uuid4(),
+      'provider_request_id' => null,
+      'service_slug'        => 'inss',
+      'cpf_hash'            => hash('sha256', $beneficio),
+      'cpf_masked'          => acme_mask_beneficio($beneficio),
+      'webhook_url'         => '',
+      'status'              => 'pending',
+      'created_at'          => current_time('mysql'),
+      'updated_at'          => current_time('mysql'),
+      'cpf'                 => $beneficio,
+
+    ]
+  );
+
+  if (!$inserted) {
+    return acme_err(500, 'Falha ao criar requisição INSS.', 'DB_ERROR');
+  }
+
+  $response = wp_remote_get($providerUrl, [
+    'timeout' => 20,
+    'headers' => [
+      'Accept' => 'application/json',
+    ],
+  ]);
+
+  if (is_wp_error($response)) {
+
+    $wpdb->update(
+      $requestsTable,
+      [
+        'status'        => 'failed',
+        'error_code'    => 'HTTP_ERROR',
+        'error_message' => $response->get_error_message(),
+        'completed_at'  => current_time('mysql'),
+        'updated_at'    => current_time('mysql'),
+      ],
+      [
+        'request_id'   => $requestId,
+        'service_slug' => 'inss',
+      ]
+    );
+
+    return acme_err(
+      502,
+      'Erro ao consultar fornecedor INSS.',
+      'HTTP_ERROR'
+    );
+  }
+
+  $statusCode   = (int) wp_remote_retrieve_response_code($response);
+  $responseBody = (string) wp_remote_retrieve_body($response);
+
+  if ($statusCode !== 200 || $responseBody === '') {
+
+    $wpdb->update(
+      $requestsTable,
+      [
+        'status'        => 'failed',
+        'error_code'    => 'BAD_STATUS',
+        'error_message' => 'Fornecedor respondeu HTTP ' . $statusCode,
+        'response'      => $responseBody,
+        'completed_at'  => current_time('mysql'),
+        'updated_at'    => current_time('mysql'),
+      ],
+      [
+        'request_id'   => $requestId,
+        'service_slug' => 'inss',
+      ]
+    );
+
+    return acme_err(
+      502,
+      'Fornecedor indisponível.',
+      'BAD_STATUS'
+    );
+  }
+
+  $decodedResponse = json_decode($responseBody, true);
+
+  if (!is_array($decodedResponse)) {
+
+    $wpdb->update(
+      $requestsTable,
+      [
+        'status'        => 'failed',
+        'error_code'    => 'INVALID_JSON',
+        'error_message' => 'Resposta inválida do fornecedor',
+        'response'      => $responseBody,
+        'completed_at'  => current_time('mysql'),
+        'updated_at'    => current_time('mysql'),
+      ],
+      [
+        'request_id'   => $requestId,
+        'service_slug' => 'inss',
+      ]
+    );
+
+    return acme_err(
+      502,
+      'Resposta inválida do fornecedor.',
+      'INVALID_JSON'
+    );
+  }
+
+  //
+  // ✔ BENEFÍCIO INVÁLIDO
+  //
+
+  if (!empty($decodedResponse['message'])) {
+
+    $message = (string) $decodedResponse['message'];
+
+    $wpdb->update(
+      $requestsTable,
+      [
+        'status'        => 'failed',
+        'error_code'    => 'PROVIDER_ERROR',
+        'error_message' => $message,
+        'response'      => $responseBody,
+        'completed_at'  => current_time('mysql'),
+        'updated_at'    => current_time('mysql'),
+      ],
+      [
+        'request_id'   => $requestId,
+        'service_slug' => 'inss',
+      ]
+    );
+
+    return acme_err(
+      400,
+      $message,
+      'PROVIDER_ERROR'
+    );
+  }
+
+  //
+  // ✔ SUCESSO COM DADOS
+  //
+
+  if (empty($decodedResponse['dados'])) {
+
+    $wpdb->update(
+      $requestsTable,
+      [
+        'status'        => 'failed',
+        'error_code'    => 'NO_DATA',
+        'error_message' => 'Fornecedor não retornou dados.',
+        'response'      => $responseBody,
+        'completed_at'  => current_time('mysql'),
+        'updated_at'    => current_time('mysql'),
+      ],
+      [
+        'request_id'   => $requestId,
+        'service_slug' => 'inss',
+      ]
+    );
+
+    return acme_err(
+      502,
+      'Fornecedor não retornou dados.',
+      'NO_DATA'
+    );
+  }
+
+  //
+  // ✔ DEBITAR CRÉDITO AQUI
+  //
+
+  // Debitar crédito aqui usando o mesmo fluxo do CLT,
+  // buscando o custo do serviço "inss" na tabela de serviços.
+
+if ($userId > 0 && function_exists('acme_consume_credit') && function_exists('acme_get_service_credit_cost')) {
+  $cost = (int) acme_get_service_credit_cost('inss');
+
+  if ($cost > 0) {
+    acme_consume_credit($userId, 'inss', $cost, $requestId);
+  }
+}
+
+  $wpdb->update(
+    $requestsTable,
+    [
+      'status'        => 'completed',
+      'response_json' => $responseBody,
+      'response'      => $responseBody,
+      'completed_at'  => current_time('mysql'),
+      'updated_at'    => current_time('mysql'),
+      'error_code'    => null,
+      'error_message' => null,
+    ],
+    [
+      'request_id'   => $requestId,
+      'service_slug' => 'inss',
+    ]
+  );
+
+  return acme_ok([
+    'success' => true,
+    'message' => 'Consulta INSS concluída.',
+    'data'    => [
+      'request_id'    => $requestId,
+      'status'        => 'completed',
+      'response_data' => $decodedResponse,
+    ],
+  ], 200);
+}
+/* ============================================================
+ * GET /api-inss-status
+ * ============================================================
+ */
+
+function acme_api_inss_status(WP_REST_Request $req)
+{
+  global $wpdb;
+
+  $requestId = (string) ($req->get_param('request_id') ?? '');
+  if ($requestId === '') {
+    return acme_err(400, 'request_id obrigatório', 'MISSING_REQUEST_ID');
+  }
+
+  $userId = acme_resolve_authenticated_user_id($req);
+  if ($userId <= 0) {
+    return acme_err(401, 'Você precisa estar logado ou informar uma API key válida.', 'NOT_AUTHENTICATED');
+  }
+
+  $requestsTable = $wpdb->prefix . 'clt_requests';
+
+  $row = $wpdb->get_row(
+    $wpdb->prepare(
+      "SELECT *
+             FROM {$requestsTable}
+             WHERE request_id = %s
+               AND service_slug = %s
+             LIMIT 1",
+      $requestId,
+      'inss'
+    ),
+    ARRAY_A
+  );
+
+  if (!$row) {
+    return acme_err(404, 'Requisição INSS não encontrada', 'NOT_FOUND');
+  }
+
+  if (!current_user_can('manage_options') && (int) $row['user_id'] !== $userId) {
+    return acme_err(403, 'Você não tem permissão para consultar esta requisição.', 'REQUEST_NOT_OWNED_BY_USER');
+  }
+
+  $responseData = null;
+  if (!empty($row['response_json'])) {
+    $decodedResponse = json_decode($row['response_json'], true);
+    $responseData = is_array($decodedResponse) ? $decodedResponse : null;
+  }
+
+  $data = [
+    'request_id'          => (string) $row['request_id'],
+    'provider_request_id' => $row['provider_request_id'] ?? null,
+    'beneficio'           => (string) ($row['cpf_masked'] ?? ''),
+    'status'              => (string) ($row['status'] ?? 'pending'),
+    'created_at'          => $row['created_at'] ?? null,
+    'updated_at'          => $row['updated_at'] ?? null,
+    'completed_at'        => $row['completed_at'] ?? null,
+  ];
+
+  if ($row['status'] === 'completed') {
+    $data['response_data'] = $responseData;
+    $data['message'] = 'Consulta INSS concluída.';
+  }
+
+  if ($row['status'] === 'failed') {
+    $data['error'] = [
+      'code' => $row['error_code'] ?: 'FAILED',
+      'message' => $row['error_message'] ?: 'Houve um erro no processamento da consulta.',
+    ];
+  }
+
+  return acme_ok([
+    'success' => true,
+    'data'    => $data,
+  ], 200);
+}
+
+
+add_action(
+  'acme_inss_real_dispatch',
+  'acme_inss_real_dispatch_handler',
+  10,
+  3
+);
+
+function acme_inss_real_dispatch_handler(
+  string $requestId,
+  string $beneficio,
+  $webhookUrl
+) {
+  global $wpdb;
+
+  $requestsTable = $wpdb->prefix . 'clt_requests';
+
+  if (!defined('ACME_INSS_API_BASE')) {
+    error_log('[ACME INSS] API base não configurada');
+    return;
+  }
+
+  $url =
+    rtrim(ACME_INSS_API_BASE, '/') .
+    '/' .
+    urlencode($beneficio);
+
+  error_log('[ACME INSS] GET ' . $url);
+
+  $response = wp_remote_get($url, [
+    'timeout' => 20,
+  ]);
+
+  if (is_wp_error($response)) {
+
+    $wpdb->update(
+      $requestsTable,
+      [
+        'status' => 'failed',
+        'error_code' => 'HTTP_ERROR',
+        'error_message' => $response->get_error_message(),
+        'completed_at' => current_time('mysql'),
+        'updated_at' => current_time('mysql'),
+      ],
+      [
+        'request_id' => $requestId,
+        'service_slug' => 'inss',
+      ]
+    );
+
+    return;
+  }
+
+  $status = wp_remote_retrieve_response_code($response);
+  $body   = wp_remote_retrieve_body($response);
+
+  if ($status !== 200 || empty($body)) {
+
+    $wpdb->update(
+      $requestsTable,
+      [
+        'status' => 'failed',
+        'error_code' => 'BAD_STATUS',
+        'error_message' => 'HTTP ' . $status,
+        'response' => $body,
+        'completed_at' => current_time('mysql'),
+        'updated_at' => current_time('mysql'),
+      ],
+      [
+        'request_id' => $requestId,
+        'service_slug' => 'inss',
+      ]
+    );
+
+    return;
+  }
+
+  // sucesso
+
+  $wpdb->update(
+    $requestsTable,
+    [
+      'status' => 'completed',
+      'response_json' => $body,
+      'completed_at' => current_time('mysql'),
+      'updated_at' => current_time('mysql'),
+    ],
+    [
+      'request_id' => $requestId,
+      'service_slug' => 'inss',
+    ]
+  );
+
+  error_log('[ACME INSS] completed ' . $requestId);
 }

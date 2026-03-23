@@ -370,7 +370,7 @@ if (!function_exists('acme_ajax_clt_query')) {
  */
 
 
-add_action('wp_enqueue_scripts', function () {
+/*add_action('wp_enqueue_scripts', function () {
   if (!is_user_logged_in()) return;
 
   $js_rel  = 'assets/js/acme-clt-form.js';
@@ -385,6 +385,7 @@ add_action('wp_enqueue_scripts', function () {
   // versões por filemtime (cache-busting seguro)
   $js_ver  = file_exists($js_path) ? (string) filemtime($js_path) : null;
   $css_ver = file_exists($css_path) ? (string) filemtime($css_path) : null;
+
 
   // CSS
   wp_register_style('acme-clt-style', $css_url, [], $css_ver);
@@ -401,8 +402,77 @@ add_action('wp_enqueue_scripts', function () {
     'restNonce'  => wp_create_nonce('wp_rest'),
     'pdfUrl'     => admin_url('admin-ajax.php?action=acme_clt_pdf_request&_wpnonce=' . wp_create_nonce('acme_clt_pdf_nonce')),
   ]);
-});
+});*/
+add_action('wp_enqueue_scripts', function () {
+  if (!is_user_logged_in()) return;
 
+  // ===== CLT =====
+  $js_rel  = 'assets/js/acme-clt-form.js';
+  $css_rel = 'assets/css/acme-clt.css';
+
+  $js_path  = trailingslashit(ACME_ACC_PATH) . $js_rel;
+  $css_path = trailingslashit(ACME_ACC_PATH) . $css_rel;
+
+  $js_url  = trailingslashit(ACME_ACC_URL) . $js_rel;
+  $css_url = trailingslashit(ACME_ACC_URL) . $css_rel;
+
+  $js_ver  = file_exists($js_path) ? (string) filemtime($js_path) : null;
+  $css_ver = file_exists($css_path) ? (string) filemtime($css_path) : null;
+
+  wp_register_style('acme-clt-style', $css_url, [], $css_ver);
+  wp_enqueue_style('acme-clt-style');
+
+  wp_register_script('acme-clt-form', $js_url, [], $js_ver, true);
+  wp_enqueue_script('acme-clt-form');
+
+  wp_localize_script('acme-clt-form', 'ACME_CLT', [
+    'restStart'  => rest_url('acme/v1/api-clt'),
+    'restStatus' => rest_url('acme/v1/api-clt-status'),
+    'restNonce'  => wp_create_nonce('wp_rest'),
+    'pdfUrl'     => admin_url('admin-ajax.php?action=acme_clt_pdf_request&_wpnonce=' . wp_create_nonce('acme_clt_pdf_nonce')),
+  ]);
+
+  // ===== INSS =====
+  global $post;
+
+  if (
+    $post &&
+    !empty($post->post_content) &&
+    has_shortcode($post->post_content, 'acme_inss_form')
+  ) {
+    $inss_js_rel   = 'assets/js/acme-inss-form.js';
+    $inss_css_rel  = 'assets/css/acme-inss.css';
+
+    $inss_js_path  = trailingslashit(ACME_ACC_PATH) . $inss_js_rel;
+    $inss_css_path = trailingslashit(ACME_ACC_PATH) . $inss_css_rel;
+
+    $inss_js_url   = trailingslashit(ACME_ACC_URL) . $inss_js_rel;
+    $inss_css_url  = trailingslashit(ACME_ACC_URL) . $inss_css_rel;
+
+    $inss_js_ver   = file_exists($inss_js_path) ? (string) filemtime($inss_js_path) : null;
+    $inss_css_ver  = file_exists($inss_css_path) ? (string) filemtime($inss_css_path) : null;
+
+    $clt_css_rel  = 'assets/css/acme-clt.css';
+    $clt_css_path = trailingslashit(ACME_ACC_PATH) . $clt_css_rel;
+    $clt_css_url  = trailingslashit(ACME_ACC_URL) . $clt_css_rel;
+    $clt_css_ver  = file_exists($clt_css_path) ? (string) filemtime($clt_css_path) : null;
+
+    wp_register_style('acme-clt-style', $clt_css_url, [], $clt_css_ver);
+    wp_enqueue_style('acme-clt-style');
+
+    wp_register_style('acme-inss-style', $inss_css_url, [], $inss_css_ver);
+    wp_enqueue_style('acme-inss-style');
+
+    wp_register_script('acme-inss-form', $inss_js_url, [], $inss_js_ver, true);
+    wp_enqueue_script('acme-inss-form');
+
+    wp_localize_script('acme-inss-form', 'ACME_INSS', [
+      'restStart'  => rest_url('acme/v1/api-inss'),
+      'restStatus' => rest_url('acme/v1/api-inss-status'),
+      'restNonce'  => wp_create_nonce('wp_rest'),
+    ]);
+  }
+});
 
 /* ============================================================
  * 8) PDF HTML BUILDER (CLT) — ajustado ao formato response_json
@@ -1506,3 +1576,8 @@ if (!function_exists('acme_get_credit_table_service_totals')) {
     return is_array($rows) ? $rows : [];
   }
 }
+
+
+/**
+ * Novo serviço INSS
+ */
