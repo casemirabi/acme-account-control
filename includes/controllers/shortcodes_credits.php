@@ -869,7 +869,7 @@ add_shortcode('acme_credits_snapshot', function () {
           $clsSaldo = ($saldo < 0) ? 'acme-neg' : 'acme-pos';
         ?>
           <div class="acme-snapshot-row">
-            <span class="acme-snapshot-name"><?php echo "Extrato de Consumo"; //esc_html($r->service_name); 
+            <span class="acme-snapshot-name"><?php echo esc_html($r->service_name); //esc_html($r->service_name); 
                                               ?></span>
 
             <span class="acme-snapshot-saldo <?php echo esc_attr($clsSaldo); ?>">
