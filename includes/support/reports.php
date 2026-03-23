@@ -649,7 +649,7 @@ add_filter('acme_export_registry', function ($r) {
     'fetch' => function ($state, $limit, $offset) {
       global $wpdb;
 
-      $t = $wpdb->prefix . 'clt_requests';
+      $t = $wpdb->prefix . 'service_requests';
       $usersT = $wpdb->users;
 
       $where = [];

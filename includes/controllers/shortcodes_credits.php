@@ -1556,7 +1556,7 @@ add_shortcode('acme_clt_panel', function () {
   }
 
   global $wpdb;
-  $t = $wpdb->prefix . 'clt_requests';
+  $t = $wpdb->prefix . 'service_requests';
 
   $me = get_current_user_id();
   $is_admin = current_user_can('manage_options');

@@ -769,7 +769,7 @@ add_action('wp_ajax_acme_clt_pdf', function () {
 });
 
 /**
- * ✅ PDF por request_id (fluxo novo, compatível com clt_requests/response_json)
+ * ✅ PDF por request_id (fluxo novo, compatível com service_requests/response_json)
  * Regra mantida: só gera PDF se status=completed
  *
  * ✅ Ajustado: response_json => payload.dados[0] contém margem/vinculos/propostas
@@ -784,7 +784,7 @@ add_action('wp_ajax_acme_clt_pdf_request', function () {
   if (!$request_id) wp_die('request_id obrigatório.');
 
   global $wpdb;
-  $table = $wpdb->prefix . 'clt_requests';
+  $table = $wpdb->prefix . 'service_requests';
 
   $is_admin = current_user_can('manage_options');
 

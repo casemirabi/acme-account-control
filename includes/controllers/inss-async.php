@@ -12,7 +12,7 @@ if (!defined('ABSPATH')) {
  *
  * Regras:
  * - Sem tabela própria
- * - Reutiliza {$wpdb->prefix}clt_requests
+ * - Reutiliza {$wpdb->prefix}service_requests
  * - Identifica requests do INSS por service_slug = 'inss'
  * - Campo de entrada: numero do beneficio
  * - Crédito validado pelo serviço "inss"
@@ -121,7 +121,7 @@ function acme_inss_simulate_success(WP_REST_Request $req)
     return acme_err(400, 'request_id obrigatório', 'MISSING_REQUEST_ID');
   }
 
-  $requestsTable = $wpdb->prefix . 'clt_requests';
+  $requestsTable = $wpdb->prefix . 'service_requests';
 
   $row = $wpdb->get_row(
     $wpdb->prepare(
@@ -224,7 +224,7 @@ function acme_inss_simulate_fail(WP_REST_Request $req)
     return acme_err(400, 'request_id obrigatório', 'MISSING_REQUEST_ID');
   }
 
-  $requestsTable = $wpdb->prefix . 'clt_requests';
+  $requestsTable = $wpdb->prefix . 'service_requests';
 
   $row = $wpdb->get_row(
     $wpdb->prepare(
@@ -386,7 +386,7 @@ function acme_api_inss_start(WP_REST_Request $req)
   }
 
   $requestId = acme_make_inss_request_id();
-  $requestsTable = $wpdb->prefix . 'clt_requests';
+  $requestsTable = $wpdb->prefix . 'service_requests';
 
   $serviceId = function_exists('acme_get_service_id_by_slug')
     ? (int) acme_get_service_id_by_slug('inss')
@@ -511,16 +511,24 @@ function acme_api_inss_start(WP_REST_Request $req)
   // ✔ BENEFÍCIO INVÁLIDO
   //
 
-  if (!empty($decodedResponse['message'])) {
+  $providerMessage = '';
 
-    $message = (string) $decodedResponse['message'];
+  if (!empty($decodedResponse['message'])) {
+    $providerMessage = (string) $decodedResponse['message'];
+  }
+
+  if (!empty($decodedResponse['mensagem'])) {
+    $providerMessage = (string) $decodedResponse['mensagem'];
+  }
+
+  if ($providerMessage !== '') {
 
     $wpdb->update(
       $requestsTable,
       [
         'status'        => 'failed',
         'error_code'    => 'PROVIDER_ERROR',
-        'error_message' => $message,
+        'error_message' => $providerMessage,
         'response'      => $responseBody,
         'completed_at'  => current_time('mysql'),
         'updated_at'    => current_time('mysql'),
@@ -533,7 +541,7 @@ function acme_api_inss_start(WP_REST_Request $req)
 
     return acme_err(
       400,
-      $message,
+      $providerMessage,
       'PROVIDER_ERROR'
     );
   }
@@ -574,13 +582,13 @@ function acme_api_inss_start(WP_REST_Request $req)
   // Debitar crédito aqui usando o mesmo fluxo do CLT,
   // buscando o custo do serviço "inss" na tabela de serviços.
 
-if ($userId > 0 && function_exists('acme_consume_credit') && function_exists('acme_get_service_credit_cost')) {
-  $cost = (int) acme_get_service_credit_cost('inss');
+  if ($userId > 0 && function_exists('acme_consume_credit') && function_exists('acme_get_service_credit_cost')) {
+    $cost = (int) acme_get_service_credit_cost('inss');
 
-  if ($cost > 0) {
-    acme_consume_credit($userId, 'inss', $cost, $requestId);
+    if ($cost > 0) {
+      acme_consume_credit($userId, 'inss', $cost, $requestId);
+    }
   }
-}
 
   $wpdb->update(
     $requestsTable,
@@ -628,7 +636,7 @@ function acme_api_inss_status(WP_REST_Request $req)
     return acme_err(401, 'Você precisa estar logado ou informar uma API key válida.', 'NOT_AUTHENTICATED');
   }
 
-  $requestsTable = $wpdb->prefix . 'clt_requests';
+  $requestsTable = $wpdb->prefix . 'service_requests';
 
   $row = $wpdb->get_row(
     $wpdb->prepare(
@@ -700,7 +708,7 @@ function acme_inss_real_dispatch_handler(
 ) {
   global $wpdb;
 
-  $requestsTable = $wpdb->prefix . 'clt_requests';
+  $requestsTable = $wpdb->prefix . 'service_requests';
 
   if (!defined('ACME_INSS_API_BASE')) {
     error_log('[ACME INSS] API base não configurada');

@@ -82,7 +82,7 @@ function acme_clt_simulate_success(WP_REST_Request $req)
   if (!$rid)
     return acme_err(400, 'request_id obrigatório', 'MISSING_REQUEST_ID');
 
-  $reqT = $wpdb->prefix . 'clt_requests';
+  $reqT = $wpdb->prefix . 'service_requests';
   $row = $wpdb->get_row($wpdb->prepare("SELECT * FROM {$reqT} WHERE request_id=%s LIMIT 1", $rid), ARRAY_A);
   if (!$row)
     return acme_err(404, 'Requisição não encontrada', 'NOT_FOUND');
@@ -118,7 +118,7 @@ function acme_clt_simulate_fail(WP_REST_Request $req)
   if (!$rid)
     return acme_err(400, 'request_id obrigatório', 'MISSING_REQUEST_ID');
 
-  $reqT = $wpdb->prefix . 'clt_requests';
+  $reqT = $wpdb->prefix . 'service_requests';
   $row = $wpdb->get_row($wpdb->prepare("SELECT * FROM {$reqT} WHERE request_id=%s LIMIT 1", $rid), ARRAY_A);
   if (!$row)
     return acme_err(404, 'Requisição não encontrada', 'NOT_FOUND');
@@ -204,7 +204,7 @@ if (!function_exists('acme_clt_wait_for_completion')) {
   function acme_clt_wait_for_completion(string $rid, int $timeoutSeconds = 25, int $intervalMs = 700): array
   {
     global $wpdb;
-    $t = $wpdb->prefix . 'clt_requests';
+    $t = $wpdb->prefix . 'service_requests';
 
     $timeoutSeconds = max(1, min(55, (int) $timeoutSeconds));
     $intervalMs = max(200, min(2000, (int) $intervalMs));
@@ -324,7 +324,7 @@ function acme_api_clt_start(WP_REST_Request $req)
     : 0;
 
   // Insere request pendente
-  $reqT = $wpdb->prefix . 'clt_requests';
+  $reqT = $wpdb->prefix . 'service_requests';
   $wpdb->insert($reqT, [
     'user_id' => (int) $uid,
     'request_id' => $rid,
@@ -543,7 +543,7 @@ function acme_api_clt_status(WP_REST_Request $req)
     return acme_err(400, 'request_id obrigatório', 'MISSING_REQUEST_ID');
 
   $row = $wpdb->get_row($wpdb->prepare(
-    "SELECT * FROM {$wpdb->prefix}clt_requests WHERE request_id=%s LIMIT 1",
+    "SELECT * FROM {$wpdb->prefix}service_requests WHERE request_id=%s LIMIT 1",
     $rid
   ), ARRAY_A);
 
@@ -643,7 +643,7 @@ function acme_api_clt_webhook(WP_REST_Request $req)
     return acme_err(400, 'request_id ou provider_request_id obrigatório', 'MISSING_REQUEST_ID');
   }
 
-  $reqT = $wpdb->prefix . 'clt_requests';
+  $reqT = $wpdb->prefix . 'service_requests';
 
   // Busca preferencial por request_id; fallback por provider_request_id
   $row = null;
@@ -966,7 +966,7 @@ function acme_api_clt_webhook(WP_REST_Request $req)
 add_action('acme_clt_finish', function ($rid) {
   global $wpdb;
 
-  $reqT = $wpdb->prefix . 'clt_requests';
+  $reqT = $wpdb->prefix . 'service_requests';
   $row = $wpdb->get_row($wpdb->prepare("SELECT * FROM {$reqT} WHERE request_id=%s LIMIT 1", $rid), ARRAY_A);
   if (!$row)
     return;
@@ -1056,7 +1056,7 @@ add_action('acme_clt_real_dispatch', function ($request_id, $cpf, $webhook_url) 
       'body' => wp_json_encode($body_payload),
     ]);
 
-    $reqT = $wpdb->prefix . 'clt_requests';
+    $reqT = $wpdb->prefix . 'service_requests';
 
     if (is_wp_error($resp)) {
       $msg = $resp->get_error_message();
@@ -1161,7 +1161,7 @@ add_action('acme_clt_real_dispatch', function ($request_id, $cpf, $webhook_url) 
   }
 
   if (!empty($json['request_id']) && is_string($json['request_id'])) {
-    $reqT = $wpdb->prefix . 'clt_requests';
+    $reqT = $wpdb->prefix . 'service_requests';
     $wpdb->update($reqT, [
       'provider_request_id' => $json['request_id'],
       'updated_at' => current_time('mysql'),
