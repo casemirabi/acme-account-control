@@ -135,6 +135,35 @@ if (!function_exists('acme_api_consumer_store_admin_notice')) {
   }
 }
 
+/**
+ * Consulta de saldo do fornecedor
+ */
+add_action('admin_post_acme_provider_balance_refresh', function () {
+  if (!current_user_can('manage_options')) {
+    wp_die('Sem permissão.');
+  }
+
+  check_admin_referer('acme_provider_balance_refresh');
+
+  if (function_exists('acme_provider_balance_clear_cache')) {
+    acme_provider_balance_clear_cache();
+  }
+
+  $balanceResult = function_exists('acme_provider_balance_get')
+    ? acme_provider_balance_get(true)
+    : new WP_Error('acme_provider_balance_unavailable', 'Serviço de saldo indisponível.');
+
+  if (is_wp_error($balanceResult)) {
+    acme_api_consumer_store_admin_notice('error', $balanceResult->get_error_message());
+  } else {
+    acme_api_consumer_store_admin_notice('success', 'Saldo do fornecedor atualizado com sucesso.');
+  }
+
+  wp_safe_redirect(admin_url('admin.php?page=acme-api-consumers'));
+  exit;
+});
+
+
 if (!function_exists('acme_api_consumers_admin_page')) {
   function acme_api_consumers_admin_page(): void
   {
@@ -163,6 +192,10 @@ if (!function_exists('acme_api_consumers_admin_page')) {
 
     $consumerRows = acme_api_consumer_get_all(200);
 
+    $providerBalanceData = function_exists('acme_provider_balance_get')
+      ? acme_provider_balance_get(false)
+      : new WP_Error('acme_provider_balance_unavailable', 'Serviço de saldo indisponível.');
+
     echo '<div class="wrap">';
     echo '<h1>Chaves da API</h1>';
     echo '<p>Crie e revogue chaves por usuário sem editar arquivos do plugin.</p>';
@@ -177,6 +210,31 @@ if (!function_exists('acme_api_consumers_admin_page')) {
       echo '<p><code style="font-size:14px;">' . esc_html($plainKeyData['api_key']) . '</code></p>';
       echo '<p>Consumidor: <strong>' . esc_html((string) ($plainKeyData['consumer_name'] ?? '')) . '</strong> | Usuário WP: <strong>#' . (int) ($plainKeyData['wp_user_id'] ?? 0) . '</strong></p></div>';
     }
+
+        echo '<div class="card" style="max-width:900px;padding:20px;margin-top:16px;">';
+    echo '<h2>Saldo no fornecedor - Nova Era: INSS </h2>';
+
+    if (is_wp_error($providerBalanceData)) {
+      echo '<p><strong>Status:</strong> <span style="color:#b32d2e;">indisponível</span></p>';
+      echo '<p>' . esc_html($providerBalanceData->get_error_message()) . '</p>';
+    } else {
+      $supplierBalance = (int) ($providerBalanceData['saldo'] ?? 0);
+      $fetchedAt = (string) ($providerBalanceData['fetched_at'] ?? '');
+
+      echo '<p style="font-size:28px;font-weight:700;margin:0 0 10px 0;">' . number_format_i18n($supplierBalance) . ' créditos</p>';
+
+      if ($fetchedAt !== '') {
+        echo '<p style="margin:0 0 12px 0;">Última atualização: <strong>' . esc_html(date_i18n('d/m/Y H:i:s', strtotime($fetchedAt))) . '</strong></p>';
+      }
+    }
+
+    echo '<form method="post" action="' . esc_url(admin_url('admin-post.php')) . '">';
+    wp_nonce_field('acme_provider_balance_refresh');
+    echo '<input type="hidden" name="action" value="acme_provider_balance_refresh">';
+    submit_button('Atualizar saldo agora', 'secondary', '', false);
+    echo '</form>';
+
+    echo '</div>';
 
     echo '<div class="card" style="max-width:900px;padding:20px;margin-top:16px;">';
     echo '<h2>Criar nova chave</h2>';

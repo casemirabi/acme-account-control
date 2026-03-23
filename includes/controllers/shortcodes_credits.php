@@ -2182,6 +2182,96 @@ if (!function_exists('acme_render_credit_table_html')) {
           </p>
         </div>
 
+        <?php
+$isAdmin = current_user_can('manage_options');
+?>
+
+<?php if ($isAdmin): ?>
+
+<?php
+$balanceCacheKey = 'acme_inss_balance_cache';
+
+$balanceData = get_transient($balanceCacheKey);
+
+if (!is_array($balanceData)) {
+
+  $saldo = null;
+  $erro = null;
+
+  $endpoint = 'https://novaeraapp.b-cdn.net/v1/consultav2/94de3edb-7082-4810-9727-4dbe243b8fff/saldo';
+
+  $response = wp_remote_get($endpoint, [
+    'timeout' => 10,
+    'sslverify' => true,
+    'headers' => [
+      'Accept' => 'application/json',
+    ],
+  ]);
+
+  if (is_wp_error($response)) {
+
+    $erro = $response->get_error_message();
+
+  } else {
+
+    $code = wp_remote_retrieve_response_code($response);
+    $body = wp_remote_retrieve_body($response);
+
+    if ($code === 200 && $body) {
+
+      $json = json_decode($body, true);
+
+      if (isset($json['saldo'])) {
+
+        $saldo = (int) $json['saldo'];
+
+      } else {
+
+        $erro = 'JSON inválido';
+
+      }
+
+    } else {
+
+      $erro = 'HTTP ' . $code;
+
+    }
+  }
+
+  $balanceData = [
+    'saldo' => $saldo,
+    'erro' => $erro,
+    'time' => current_time('timestamp'),
+  ];
+
+  set_transient($balanceCacheKey, $balanceData, 60);
+}
+
+?>
+
+<div class="acme-panel-body" style="padding-top:0;">
+
+  <?php if (!empty($balanceData['erro'])): ?>
+
+    <p class="acme-muted">
+      Saldo INSS fornecedor:
+      <strong style="color:#b91c1c;">indisponível</strong>
+    </p>
+
+  <?php else: ?>
+
+    <p class="acme-muted">
+      Saldo INSS fornecedor:
+      <strong><?php echo (int) $balanceData['saldo']; ?></strong>
+    </p>
+
+
+  <?php endif; ?>
+
+</div>
+
+<?php endif; ?>
+
         <?php if ($showTotals): ?>
           <div class="acme-table-wrap" style="margin-bottom:18px;">
             <table class="acme-table">

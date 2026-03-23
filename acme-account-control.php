@@ -137,6 +137,7 @@ acme_safe_require(ACME_ACC_PATH . 'includes/services/users-status-service.php', 
 
 acme_safe_require(__DIR__ . '/includes/services/credits-engine.php', true);
 acme_safe_require(__DIR__ . '/includes/services/credits-module.php', true);
+acme_safe_require(__DIR__ . '/includes/services/provider-balance-service.php', false);
 
 acme_safe_require(__DIR__ . '/includes/controllers/shortcodes_credits.php', false);
 acme_safe_require(__DIR__ . '/includes/controllers/credits-admin.php', false);
