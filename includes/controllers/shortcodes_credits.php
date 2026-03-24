@@ -2787,8 +2787,527 @@ function acme_shortcode_grant_credits()
 
 
 /**
+ * Consulta INSS
+ */
+
+/**
+ * Painel/Historico INSS
+ * Shortcode: [acme_inss_panel]
+ *
+ * Reaproveita a tabela wp_service_requests
+ * filtrando por service_slug = 'inss'
+ */
+add_shortcode('acme_inss_panel', function () {
+
+  if (!is_user_logged_in()) {
+    return '<div style="padding:12px;border:1px solid #f2c;border-radius:10px;">Faça login para ver seu histórico.</div>';
+  }
+
+  global $wpdb;
+  $tableRequests = $wpdb->prefix . 'service_requests';
+
+  $currentUserId = get_current_user_id();
+  $currentUser = wp_get_current_user();
+
+  $isAdmin = current_user_can('manage_options');
+  $isMaster = function_exists('acme_user_has_role') && acme_user_has_role($currentUser, 'child');
+  $isSublogin = function_exists('acme_user_has_role') && acme_user_has_role($currentUser, 'grandchild');
+
+  $canFilterUser = $isAdmin || $isMaster;
+
+  $visibleUserIds = function_exists('acme_get_credit_table_visible_user_ids')
+    ? acme_get_credit_table_visible_user_ids()
+    : [$currentUserId];
+
+  $visibleUserIds = array_values(array_unique(array_map('intval', (array) $visibleUserIds)));
+  if (empty($visibleUserIds)) {
+    $visibleUserIds = [$currentUserId];
+  }
+
+  // =========================
+  // 0) PAGINAÇÃO
+  // =========================
+  $perPage = 30;
+  $page = isset($_GET['inss_page']) ? max(1, (int) $_GET['inss_page']) : 1;
+
+  // =========================
+  // 1) FILTROS
+  // =========================
+  $filterStatus = isset($_GET['inss_status']) ? sanitize_text_field($_GET['inss_status']) : '';
+  $filterBeneficio = isset($_GET['inss_beneficio']) ? sanitize_text_field($_GET['inss_beneficio']) : '';
+  $filterUser = isset($_GET['inss_user']) ? sanitize_text_field($_GET['inss_user']) : '';
+  $filterDateFrom = isset($_GET['inss_date_from']) ? sanitize_text_field($_GET['inss_date_from']) : '';
+  $filterDateTo = isset($_GET['inss_date_to']) ? sanitize_text_field($_GET['inss_date_to']) : '';
+  $filterSituacao = isset($_GET['inss_situacao']) ? sanitize_text_field($_GET['inss_situacao']) : '';
+  $filterBloqueio = isset($_GET['inss_bloqueio']) ? sanitize_text_field($_GET['inss_bloqueio']) : '';
+
+  $allowedStatus = ['pending', 'completed', 'failed'];
+  if ($filterStatus && !in_array($filterStatus, $allowedStatus, true)) {
+    $filterStatus = '';
+  }
+
+  $allowedBloqueio = ['', 'sim', 'nao'];
+  if (!in_array($filterBloqueio, $allowedBloqueio, true)) {
+    $filterBloqueio = '';
+  }
+
+  $dateFromSql = '';
+  $dateToSql = '';
+
+  if ($filterDateFrom && preg_match('/^\d{4}-\d{2}-\d{2}$/', $filterDateFrom)) {
+    $dateFromSql = $filterDateFrom . ' 00:00:00';
+  }
+
+  if ($filterDateTo && preg_match('/^\d{4}-\d{2}-\d{2}$/', $filterDateTo)) {
+    $dateToSql = $filterDateTo . ' 23:59:59';
+  }
+
+  // =========================
+  // 2) WHERE BASE
+  // =========================
+  $where = [];
+  $params = [];
+
+  $where[] = 't.service_slug = %s';
+  $params[] = 'inss';
+
+  if ($isAdmin) {
+    if ($filterUser !== '') {
+      if (ctype_digit($filterUser)) {
+        $where[] = 't.user_id = %d';
+        $params[] = (int) $filterUser;
+      } else {
+        $likeUser = '%' . $wpdb->esc_like($filterUser) . '%';
+        $where[] = '(u.display_name LIKE %s OR u.user_email LIKE %s)';
+        $params[] = $likeUser;
+        $params[] = $likeUser;
+      }
+    }
+  } elseif ($isMaster) {
+    $visiblePlaceholders = implode(',', array_fill(0, count($visibleUserIds), '%d'));
+    $where[] = "t.user_id IN ({$visiblePlaceholders})";
+    $params = array_merge($params, $visibleUserIds);
+
+    if ($filterUser !== '') {
+      if (ctype_digit($filterUser)) {
+        $filteredUserId = (int) $filterUser;
+
+        if (in_array($filteredUserId, $visibleUserIds, true)) {
+          $where[] = 't.user_id = %d';
+          $params[] = $filteredUserId;
+        } else {
+          $where[] = '1 = 0';
+        }
+      } else {
+        $likeUser = '%' . $wpdb->esc_like($filterUser) . '%';
+        $where[] = '(u.display_name LIKE %s OR u.user_email LIKE %s)';
+        $params[] = $likeUser;
+        $params[] = $likeUser;
+      }
+    }
+  } else {
+    $where[] = 't.user_id = %d';
+    $params[] = $currentUserId;
+  }
+
+  if ($filterStatus !== '') {
+    $where[] = 't.status = %s';
+    $params[] = $filterStatus;
+  }
+
+  // Benefício: no INSS atual ele está salvo mascarado em cpf_masked
+  // e o hash em cpf_hash, seguindo a estratégia já usada no plugin
+  if ($filterBeneficio !== '') {
+    $beneficioNumbers = preg_replace('/\D/', '', $filterBeneficio);
+
+    if ($beneficioNumbers !== '') {
+      $where[] = '(t.cpf_hash = %s OR t.cpf_masked LIKE %s)';
+      $params[] = hash('sha256', $beneficioNumbers);
+      $params[] = '%' . $wpdb->esc_like($filterBeneficio) . '%';
+    } else {
+      $where[] = 't.cpf_masked LIKE %s';
+      $params[] = '%' . $wpdb->esc_like($filterBeneficio) . '%';
+    }
+  }
+
+  if ($dateFromSql && $dateToSql) {
+    $where[] = '(t.created_at BETWEEN %s AND %s)';
+    $params[] = $dateFromSql;
+    $params[] = $dateToSql;
+  } elseif ($dateFromSql) {
+    $where[] = 't.created_at >= %s';
+    $params[] = $dateFromSql;
+  } elseif ($dateToSql) {
+    $where[] = 't.created_at <= %s';
+    $params[] = $dateToSql;
+  }
+
+  $whereSql = !empty($where) ? 'WHERE ' . implode(' AND ', $where) : '';
+
+  // =========================
+  // 3) TOTAL BASE (sem filtro JSON)
+  // =========================
+  $sqlCount = "
+    SELECT COUNT(*)
+    FROM {$tableRequests} t
+    LEFT JOIN {$wpdb->users} u ON u.ID = t.user_id
+    {$whereSql}
+  ";
+
+  if (!empty($params)) {
+    $sqlCount = $wpdb->prepare($sqlCount, $params);
+  }
+
+  $totalBase = (int) $wpdb->get_var($sqlCount);
+
+  // =========================
+  // 4) QUERY BASE
+  // =========================
+  $sqlBase = "
+    SELECT t.*, u.display_name, u.user_email
+    FROM {$tableRequests} t
+    LEFT JOIN {$wpdb->users} u ON u.ID = t.user_id
+    {$whereSql}
+    ORDER BY t.created_at DESC
+  ";
+
+  if (!empty($params)) {
+    $sqlBase = $wpdb->prepare($sqlBase, $params);
+  }
+
+  $allRows = $wpdb->get_results($sqlBase, ARRAY_A);
+
+  // =========================
+  // 5) FILTROS COMPLEMENTARES EM PHP
+  // =========================
+  if ((!empty($filterSituacao) || !empty($filterBloqueio)) && !empty($allRows)) {
+    $allRows = array_values(array_filter($allRows, function ($row) use ($filterSituacao, $filterBloqueio) {
+      $responseJson = $row['response_json'] ?? '';
+      if ($responseJson === '') {
+        return false;
+      }
+
+      $decoded = json_decode($responseJson, true);
+      if (!is_array($decoded)) {
+        return false;
+      }
+
+      $dados = $decoded['dados'] ?? [];
+
+      $situacao = (string) ($dados['situacao'] ?? '');
+      $bloqueioValue = $dados['bloqueioEmprestimo']
+        ?? $dados['bloqueioEmprestismo']
+        ?? null;
+
+      $bloqueioNormalizado = '';
+      if ($bloqueioValue === true || $bloqueioValue === 1 || $bloqueioValue === '1') {
+        $bloqueioNormalizado = 'sim';
+      } elseif ($bloqueioValue === false || $bloqueioValue === 0 || $bloqueioValue === '0') {
+        $bloqueioNormalizado = 'nao';
+      }
+
+      if ($filterSituacao !== '' && mb_strtolower($situacao) !== mb_strtolower($filterSituacao)) {
+        return false;
+      }
+
+      if ($filterBloqueio !== '' && $bloqueioNormalizado !== $filterBloqueio) {
+        return false;
+      }
+
+      return true;
+    }));
+  }
+
+  // =========================
+  // 6) PAGINAÇÃO REAL
+  // =========================
+  $total = count($allRows);
+  $totalPages = max(1, (int) ceil($total / $perPage));
+
+  if ($page > $totalPages) {
+    $page = $totalPages;
+  }
+
+  $offset = ($page - 1) * $perPage;
+  $rows = array_slice($allRows, $offset, $perPage);
+
+  // =========================
+  // 7) RENDER
+  // =========================
+  $out = '';
+  $out .= function_exists('acme_ui_panel_css') ? acme_ui_panel_css() : '';
+
+  $out .= '<style>
+  .acme-inss-toolbar{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:12px;
+    flex-wrap:wrap;
+  }
+  .acme-inss-actions{
+    display:flex;
+    gap:8px;
+    align-items:center;
+    flex-wrap:wrap;
+  }
+  .acme-inss-filter-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(170px, 1fr));
+    gap:12px;
+    padding:14px 16px 16px;
+  }
+  .acme-inss-filter-grid .acme-field{
+    margin:0;
+    min-width:0;
+  }
+  .acme-inss-filter-grid .acme-field-user{
+    grid-column:span 2;
+  }
+  .acme-inss-filter-grid .acme-input{
+    width:100%;
+  }
+  @media (max-width: 900px){
+    .acme-inss-filter-grid .acme-field-user{
+      grid-column:span 1;
+    }
+  }
+  </style>';
+
+  $baseUrl = get_permalink();
+  $clearUrl = esc_url($baseUrl);
+
+  $showFrom = $total > 0 ? (int) ($offset + 1) : 0;
+  $showTo = (int) min($total, ($offset + count($rows)));
+
+  $out .= '<div class="acme-panel">';
+  $out .= '<div class="acme-panel-h acme-inss-toolbar">';
+  $out .= '<div>';
+  $out .= '<div class="acme-panel-title">Histórico de Consultas INSS</div>';
+  $out .= '<div class="acme-panel-sub">Mostrando ' . $showFrom . '–' . $showTo . ' de ' . (int) $total . ' registros.</div>';
+  $out .= '</div>';
+  $out .= '<div class="acme-actions acme-inss-actions">';
+  $out .= '<a class="acme-btn" href="' . esc_url(add_query_arg([], $baseUrl)) . '">Atualizar</a>';
+  $out .= '<a class="acme-btn" href="' . $clearUrl . '">Limpar filtros</a>';
+  $out .= '<button class="acme-btn-icon" type="submit" form="acme-inss-filter-form" aria-label="Pesquisar">';
+  $out .= '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true">'
+    . '<path d="M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" stroke="currentColor" stroke-width="2" />'
+    . '<path d="M16.5 16.5 21 21" stroke="currentColor" stroke-width="2" stroke-linecap="round" />'
+    . '</svg>';
+  $out .= '</button>';
+  $out .= '</div>';
+  $out .= '</div>';
+
+  // =========================
+  // 8) FILTROS
+  // =========================
+  $out .= '<div class="acme-panel-filters">';
+  $out .= '<form id="acme-inss-filter-form" method="get" action="' . esc_url($baseUrl) . '" class="acme-inss-filter-grid">';
+  $out .= '<input type="hidden" name="inss_page" value="1" />';
+
+  if ($canFilterUser) {
+    $out .= '<div class="acme-field acme-field-user">';
+    $out .= '<label class="acme-muted">Usuário / Nome</label>';
+    $out .= '<input class="acme-input" type="text" name="inss_user" value="' . esc_attr($filterUser) . '" placeholder="ID, nome ou email" />';
+    $out .= '</div>';
+  }
+
+    $out .= '<div class="acme-field">';
+  $out .= '<label class="acme-muted">Benefício</label>';
+  $out .= '<input class="acme-input" type="text" name="inss_beneficio" value="' . esc_attr($filterBeneficio) . '" placeholder="Ex.: 1234567890" />';
+  $out .= '</div>';
+
+  $out .= '<div class="acme-field">';
+  $out .= '<label class="acme-muted">Status</label>';
+  $out .= '<select class="acme-input" name="inss_status">';
+  $out .= '<option value="">Todos</option>';
+  $out .= '<option value="pending"' . selected($filterStatus, 'pending', false) . '>Pendente</option>';
+  $out .= '<option value="completed"' . selected($filterStatus, 'completed', false) . '>Completo</option>';
+  $out .= '<option value="failed"' . selected($filterStatus, 'failed', false) . '>Falha</option>';
+  $out .= '</select>';
+  $out .= '</div>';
+
+  $out .= '<div class="acme-field">';
+  $out .= '<label class="acme-muted">Situação</label>';
+  $out .= '<input class="acme-input" type="text" name="inss_situacao" value="' . esc_attr($filterSituacao) . '" placeholder="Ex.: ATIVO" />';
+  $out .= '</div>';
+
+  $out .= '<div class="acme-field">';
+  $out .= '<label class="acme-muted">Bloqueio</label>';
+  $out .= '<select class="acme-input" name="inss_bloqueio">';
+  $out .= '<option value="">Todos</option>';
+  $out .= '<option value="sim"' . selected($filterBloqueio, 'sim', false) . '>Sim</option>';
+  $out .= '<option value="nao"' . selected($filterBloqueio, 'nao', false) . '>Não</option>';
+  $out .= '</select>';
+  $out .= '</div>';
+
+
+
+  $out .= '<div class="acme-field">';
+  $out .= '<label class="acme-muted">Data (de)</label>';
+  $out .= '<input class="acme-input" type="date" name="inss_date_from" value="' . esc_attr($filterDateFrom) . '" />';
+  $out .= '</div>';
+
+  $out .= '<div class="acme-field">';
+  $out .= '<label class="acme-muted">Data (até)</label>';
+  $out .= '<input class="acme-input" type="date" name="inss_date_to" value="' . esc_attr($filterDateTo) . '" />';
+  $out .= '</div>';
+
+  $out .= '</form>';
+  $out .= '</div>';
+
+  if (empty($rows)) {
+    $out .= '<div style="padding:14px 16px;color:#64748b;">Nenhuma consulta encontrada com esses filtros.</div>';
+    $out .= '</div>';
+    return $out;
+  }
+
+  // =========================
+  // 9) TABELA
+  // =========================
+  $out .= '<div style="overflow-x:auto;width:100%;">';
+  $out .= '<table class="acme-table" style="font-size:13px;min-width:1100px;white-space:nowrap;">';
+  $out .= '<thead><tr>';
+  $out .= '<th>Criado</th>';
+
+  if ($canFilterUser) {
+    $out .= '<th>Usuário</th>';
+  }
+
+  $out .= '<th>Benefício</th>';
+  $out .= '<th>Nome</th>';
+  $out .= '<th>Espécie</th>';
+  $out .= '<th>Situação</th>';
+  $out .= '<th>Bloqueio</th>';
+  $out .= '<th>Status</th>';
+  $out .= '<th>Erro</th>';
+  $out .= '</tr></thead><tbody>';
+
+  foreach ($rows as $row) {
+    $status = $row['status'] ?? 'pending';
+    $createdAt = $row['created_at'] ?? '';
+    $createdAt = $createdAt ? date_i18n('d/m/Y H:i', strtotime($createdAt)) : '';
+
+    $badgeClass = 'acme-badge-pending';
+    if ($status === 'completed') {
+      $badgeClass = 'acme-badge-completed';
+    } elseif ($status === 'failed') {
+      $badgeClass = 'acme-badge-failed';
+    }
+
+    $statusLabel = 'Pendente';
+    if ($status === 'completed') {
+      $statusLabel = 'Completo';
+    } elseif ($status === 'failed') {
+      $statusLabel = 'Falha';
+    }
+
+    $userName = $row['display_name'] ?? ('#' . (int) $row['user_id']);
+    $beneficioMasked = $row['cpf_masked'] ?? '***';
+
+    $nome = '—';
+    $especie = '—';
+    $situacao = '—';
+    $bloqueio = '—';
+
+    $responseJson = $row['response_json'] ?? '';
+    if ($responseJson !== '') {
+      $decoded = json_decode($responseJson, true);
+
+      if (is_array($decoded)) {
+        $dados = $decoded['dados'] ?? [];
+        $nome = $dados['nome'] ?? '—';
+        $especie = $dados['especie']['descricao'] ?? '—';
+        $situacao = $dados['situacao'] ?? '—';
+
+        $bloqueioValue = $dados['bloqueioEmprestimo']
+          ?? $dados['bloqueioEmprestismo']
+          ?? null;
+
+        if ($bloqueioValue === true || $bloqueioValue === 1 || $bloqueioValue === '1') {
+          $bloqueio = 'Sim';
+        } elseif ($bloqueioValue === false || $bloqueioValue === 0 || $bloqueioValue === '0') {
+          $bloqueio = 'Não';
+        }
+      }
+    }
+
+    $errorMessage = '';
+    if ($status === 'failed') {
+      $errorMessage = $row['error_message'] ?: 'Houve um erro no processamento da consulta.';
+    }
+
+    $out .= '<tr>';
+    $out .= '<td class="acme-muted">' . esc_html($createdAt) . '</td>';
+
+    if ($canFilterUser) {
+      $out .= '<td><strong>' . esc_html($userName) . '</strong></td>';
+    }
+
+    $out .= '<td>' . esc_html($beneficioMasked) . '</td>';
+    $out .= '<td>' . esc_html($nome) . '</td>';
+    $out .= '<td>' . esc_html($especie) . '</td>';
+    $out .= '<td>' . esc_html($situacao) . '</td>';
+    $out .= '<td>' . esc_html($bloqueio) . '</td>';
+    $out .= '<td><span class="acme-badge ' . esc_attr($badgeClass) . '">' . esc_html($statusLabel) . '</span></td>';
+    $out .= '<td class="acme-col-error">' . esc_html($errorMessage) . '</td>';
+    $out .= '</tr>';
+  }
+
+  $out .= '</tbody></table>';
+  $out .= '</div>';
+
+  // =========================
+  // 10) PAGINAÇÃO
+  // =========================
+  if ($totalPages > 1) {
+    $baseArgs = $_GET;
+    unset($baseArgs['inss_page']);
+
+    $makePageUrl = function ($targetPage) use ($baseUrl, $baseArgs) {
+      $args = $baseArgs;
+      $args['inss_page'] = $targetPage;
+      return esc_url(add_query_arg($args, $baseUrl));
+    };
+
+    $prevPage = max(1, $page - 1);
+    $nextPage = min($totalPages, $page + 1);
+
+    $out .= '<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-top:1px solid #eef2f7;">';
+    $out .= '<div class="acme-muted">Página <strong>' . (int) $page . '</strong> de <strong>' . (int) $totalPages . '</strong></div>';
+    $out .= '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">';
+
+    if ($page > 1) {
+      $out .= '<a class="acme-btn" href="' . $makePageUrl(1) . '">« Primeira</a>';
+      $out .= '<a class="acme-btn" href="' . $makePageUrl($prevPage) . '">‹ Anterior</a>';
+    } else {
+      $out .= '<span class="acme-btn" style="opacity:.5;pointer-events:none;">« Primeira</span>';
+      $out .= '<span class="acme-btn" style="opacity:.5;pointer-events:none;">‹ Anterior</span>';
+    }
+
+    if ($page < $totalPages) {
+      $out .= '<a class="acme-btn" href="' . $makePageUrl($nextPage) . '">Próxima ›</a>';
+      $out .= '<a class="acme-btn" href="' . $makePageUrl($totalPages) . '">Última »</a>';
+    } else {
+      $out .= '<span class="acme-btn" style="opacity:.5;pointer-events:none;">Próxima ›</span>';
+      $out .= '<span class="acme-btn" style="opacity:.5;pointer-events:none;">Última »</span>';
+    }
+
+    $out .= '</div>';
+    $out .= '</div>';
+  }
+
+  $out .= '</div>';
+
+  return $out;
+});
+
+
+/**
  * Novo serviço: INSS 
  */
+
+
 
 add_shortcode('acme_inss_form', 'acme_shortcode_inss_form');
 
