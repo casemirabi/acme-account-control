@@ -563,8 +563,20 @@ add_filter('acme_export_registry', function ($r) {
         $status = 'ATIVO';
 
       $svc = $row['service_name'] ?: ('Serviço #' . (int) ($row['service_id'] ?? 0));
-      $venc = $valid_until ? date_i18n('d/m/Y H:i', strtotime($valid_until)) : '-';
+      $venc = '-';
 
+      if (!empty($valid_until)) {
+        $date = substr($valid_until, 0, 10);
+        $time = substr($valid_until, 11, 8);
+
+        $parts = explode('-', $date);
+
+        if (count($parts) === 3) {
+          $venc = $parts[2] . '/' . $parts[1] . '/' . $parts[0] . ' ' . $time;
+        } else {
+          $venc = $valid_until;
+        }
+      }
       return [
         '#' . (int) ($row['id'] ?? 0),
         (string) $svc,

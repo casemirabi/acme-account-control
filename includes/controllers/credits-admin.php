@@ -75,7 +75,7 @@ if (!function_exists('acme_credits_admin_page')) {
         </div>
       <?php elseif ($msg === 'err'): ?>
         <div class="notice notice-error">
-          <p><strong>Erro ao conceder créditos.</strong></p>
+          <p><strong>Ação negada.</strong></p>
         </div>
       <?php endif; ?>
 

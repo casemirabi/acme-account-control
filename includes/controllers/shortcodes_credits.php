@@ -2183,94 +2183,89 @@ if (!function_exists('acme_render_credit_table_html')) {
         </div>
 
         <?php
-$isAdmin = current_user_can('manage_options');
-?>
+        $isAdmin = current_user_can('manage_options');
+        ?>
 
-<?php if ($isAdmin): ?>
+        <?php if ($isAdmin): ?>
 
-<?php
-$balanceCacheKey = 'acme_inss_balance_cache';
+          <?php
+          $balanceCacheKey = 'acme_inss_balance_cache';
 
-$balanceData = get_transient($balanceCacheKey);
+          $balanceData = get_transient($balanceCacheKey);
 
-if (!is_array($balanceData)) {
+          if (!is_array($balanceData)) {
 
-  $saldo = null;
-  $erro = null;
+            $saldo = null;
+            $erro = null;
 
-  $endpoint = 'https://novaeraapp.b-cdn.net/v1/consultav2/94de3edb-7082-4810-9727-4dbe243b8fff/saldo';
+            $endpoint = 'https://novaeraapp.b-cdn.net/v1/consultav2/94de3edb-7082-4810-9727-4dbe243b8fff/saldo';
 
-  $response = wp_remote_get($endpoint, [
-    'timeout' => 10,
-    'sslverify' => true,
-    'headers' => [
-      'Accept' => 'application/json',
-    ],
-  ]);
+            $response = wp_remote_get($endpoint, [
+              'timeout' => 10,
+              'sslverify' => true,
+              'headers' => [
+                'Accept' => 'application/json',
+              ],
+            ]);
 
-  if (is_wp_error($response)) {
+            if (is_wp_error($response)) {
 
-    $erro = $response->get_error_message();
+              $erro = $response->get_error_message();
+            } else {
 
-  } else {
+              $code = wp_remote_retrieve_response_code($response);
+              $body = wp_remote_retrieve_body($response);
 
-    $code = wp_remote_retrieve_response_code($response);
-    $body = wp_remote_retrieve_body($response);
+              if ($code === 200 && $body) {
 
-    if ($code === 200 && $body) {
+                $json = json_decode($body, true);
 
-      $json = json_decode($body, true);
+                if (isset($json['saldo'])) {
 
-      if (isset($json['saldo'])) {
+                  $saldo = (int) $json['saldo'];
+                } else {
 
-        $saldo = (int) $json['saldo'];
+                  $erro = 'JSON inválido';
+                }
+              } else {
 
-      } else {
+                $erro = 'HTTP ' . $code;
+              }
+            }
 
-        $erro = 'JSON inválido';
+            $balanceData = [
+              'saldo' => $saldo,
+              'erro' => $erro,
+              'time' => current_time('timestamp'),
+            ];
 
-      }
+            set_transient($balanceCacheKey, $balanceData, 60);
+          }
 
-    } else {
+          ?>
 
-      $erro = 'HTTP ' . $code;
+          <div class="acme-panel-body" style="padding-top:0;">
 
-    }
-  }
+            <?php if (!empty($balanceData['erro'])): ?>
 
-  $balanceData = [
-    'saldo' => $saldo,
-    'erro' => $erro,
-    'time' => current_time('timestamp'),
-  ];
+              <p class="acme-muted">
+                Saldo INSS fornecedor:
+                <strong style="color:#b91c1c;">indisponível</strong>
+              </p>
 
-  set_transient($balanceCacheKey, $balanceData, 60);
-}
+            <?php else: ?>
 
-?>
-
-<div class="acme-panel-body" style="padding-top:0;">
-
-  <?php if (!empty($balanceData['erro'])): ?>
-
-    <p class="acme-muted">
-      Saldo INSS fornecedor:
-      <strong style="color:#b91c1c;">indisponível</strong>
-    </p>
-
-  <?php else: ?>
-
-    <p class="acme-muted">
-      Saldo INSS fornecedor:
-      <strong><?php echo (int) $balanceData['saldo']; ?></strong>
-    </p>
+              <p class="acme-muted">
+                Saldo INSS fornecedor:
+                <strong><?php echo (int) $balanceData['saldo']; ?></strong>
+              </p>
 
 
-  <?php endif; ?>
+            <?php endif; ?>
 
-</div>
+          </div>
 
-<?php endif; ?>
+        <?php endif; ?>
 
         <?php if ($showTotals): ?>
           <div class="acme-table-wrap" style="margin-bottom:18px;">
@@ -2355,7 +2350,13 @@ if (!is_array($balanceData)) {
                 if (empty($expiresAt)) {
                   echo 'Sem validade';
                 } else {
-                  echo esc_html(wp_date('d/m/Y H:i:s', strtotime($expiresAt)));
+                  $date = substr($expiresAt, 0, 10);
+                  $time = substr($expiresAt, 11, 8);
+                  $parts = explode('-', $date);
+
+                  echo (count($parts) === 3)
+                    ? esc_html($parts[2] . '/' . $parts[1] . '/' . $parts[0] . ' ' . $time)
+                    : esc_html($expiresAt);
                 }
                 ?>
               </td>
