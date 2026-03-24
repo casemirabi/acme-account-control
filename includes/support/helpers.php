@@ -846,6 +846,110 @@ add_action('wp_ajax_acme_clt_pdf_request', function () {
   acme_pdf_stream_html($html, 'consulta-clt-' . $request_id . '.pdf');
 });
 
+add_action('wp_ajax_acme_inss_pdf_request', function () {
+  if (!is_user_logged_in()) {
+    wp_die('Você precisa estar logado.');
+  }
+
+  $nonce = $_GET['_wpnonce'] ?? '';
+  if (!$nonce || !wp_verify_nonce($nonce, 'acme_inss_pdf_nonce')) {
+    wp_die('Token inválido.');
+  }
+
+  $requestId = sanitize_text_field($_GET['request_id'] ?? '');
+  if (!$requestId) {
+    wp_die('request_id obrigatório.');
+  }
+
+  global $wpdb;
+  $table = $wpdb->prefix . 'service_requests';
+
+  $currentUserId = get_current_user_id();
+  $currentUser = wp_get_current_user();
+
+  $isAdmin = current_user_can('manage_options');
+  $isMaster = function_exists('acme_user_has_role') && acme_user_has_role($currentUser, 'child');
+
+  if ($isAdmin) {
+    $row = $wpdb->get_row(
+      $wpdb->prepare(
+        "SELECT * FROM {$table}
+         WHERE (request_id = %s OR provider_request_id = %s)
+           AND service_slug = %s
+         LIMIT 1",
+        $requestId,
+        $requestId,
+        'inss'
+      ),
+      ARRAY_A
+    );
+  } elseif ($isMaster && function_exists('acme_get_credit_table_visible_user_ids')) {
+    $visibleUserIds = acme_get_credit_table_visible_user_ids();
+    $visibleUserIds = array_values(array_unique(array_map('intval', (array) $visibleUserIds)));
+
+    if (empty($visibleUserIds)) {
+      $visibleUserIds = [$currentUserId];
+    }
+
+    $placeholders = implode(',', array_fill(0, count($visibleUserIds), '%d'));
+
+    $sql = "
+      SELECT * FROM {$table}
+      WHERE (request_id = %s OR provider_request_id = %s)
+        AND service_slug = %s
+        AND user_id IN ({$placeholders})
+      LIMIT 1
+    ";
+
+    $params = array_merge([$requestId, $requestId, 'inss'], $visibleUserIds);
+
+    $row = $wpdb->get_row(
+      $wpdb->prepare($sql, $params),
+      ARRAY_A
+    );
+  } else {
+    $row = $wpdb->get_row(
+      $wpdb->prepare(
+        "SELECT * FROM {$table}
+         WHERE (request_id = %s OR provider_request_id = %s)
+           AND service_slug = %s
+           AND user_id = %d
+         LIMIT 1",
+        $requestId,
+        $requestId,
+        'inss',
+        $currentUserId
+      ),
+      ARRAY_A
+    );
+  }
+
+  if (!$row) {
+    wp_die('Requisição INSS não encontrada.');
+  }
+
+  if (($row['status'] ?? '') !== 'completed') {
+    wp_die('Consulta ainda não foi concluída.');
+  }
+
+  $payload = json_decode($row['response_json'] ?? '{}', true);
+  if (!is_array($payload)) {
+    wp_die('response_json inválido.');
+  }
+
+  $dados = [];
+  if (isset($payload['dados']) && is_array($payload['dados'])) {
+    $dados = $payload['dados'];
+  }
+
+  if (empty($dados)) {
+    wp_die('Dados da consulta INSS não encontrados.');
+  }
+
+  $html = acme_inss_build_pdf_html($row, $dados);
+  acme_pdf_stream_html($html, 'consulta-inss-' . $requestId . '.pdf');
+});
+
 /* ============================================================
  * 10) CRÉDITOS (LOTS) — Service lookup + balance + debug + consumo
  * ============================================================
@@ -1581,3 +1685,467 @@ if (!function_exists('acme_get_credit_table_service_totals')) {
 /**
  * Novo serviço INSS
  */
+if (!function_exists('acme_inss_build_pdf_html')) {
+  function acme_inss_build_pdf_html(array $row, array $dados): string
+  {
+    $fmtDateTime = function ($value): string {
+      if (empty($value)) {
+        return '—';
+      }
+
+      $timestamp = strtotime((string) $value);
+      if (!$timestamp) {
+        return '—';
+      }
+
+      return date_i18n('d/m/Y H:i:s', $timestamp);
+    };
+
+    $esc = function ($value): string {
+      $stringValue = is_scalar($value) ? (string) $value : '—';
+      return esc_html($stringValue !== '' ? $stringValue : '—');
+    };
+
+    $formatMoney = function ($value): string {
+      if ($value === null || $value === '') {
+        return '—';
+      }
+
+      if (is_numeric($value)) {
+        return 'R$ ' . number_format((float) $value, 2, ',', '.');
+      }
+
+      return esc_html((string) $value);
+    };
+
+    $formatDate = function ($value): string {
+      if (empty($value)) {
+        return '—';
+      }
+
+      $timestamp = strtotime((string) $value);
+      if (!$timestamp) {
+        return esc_html((string) $value);
+      }
+
+      return date_i18n('d/m/Y', $timestamp);
+    };
+
+    $boolLabel = function ($value): string {
+      if ($value === true || $value === 1 || $value === '1') {
+        return 'Sim';
+      }
+
+      if ($value === false || $value === 0 || $value === '0') {
+        return 'Não';
+      }
+
+      return '—';
+    };
+
+    $beneficio = (string) ($row['cpf_masked'] ?? '—');
+    $nome = (string) ($dados['nome'] ?? '—');
+    $situacao = (string) ($dados['situacao'] ?? '—');
+    $especie = (string) ($dados['especie']['descricao'] ?? '—');
+    $bloqueio = $boolLabel(
+      $dados['bloqueioEmprestimo']
+      ?? $dados['bloqueioEmprestismo']
+      ?? null
+    );
+
+    $cpf = (string) ($dados['cpf'] ?? '—');
+    $nit = (string) ($dados['nit'] ?? '—');
+    $dataNascimento = $formatDate($dados['dataNascimento'] ?? '');
+    $orgaoPagador = (string) ($dados['orgaoPagador'] ?? '—');
+    $ufAgencia = (string) ($dados['ufAgencia'] ?? '—');
+    $codigoAgencia = (string) ($dados['codigoAgencia'] ?? '—');
+    $representanteLegal = (string) ($dados['representanteLegal'] ?? '—');
+
+    $margemBase = $dados['margemBase'] ?? '—';
+    $margemDisponivel = $dados['margemDisponivel'] ?? '—';
+    $margemRmc = $dados['margemRmc'] ?? '—';
+    $margemRcc = $dados['margemRcc'] ?? '—';
+
+    $contratosEmprestimo = isset($dados['contratosEmprestimo']) && is_array($dados['contratosEmprestimo'])
+      ? $dados['contratosEmprestimo']
+      : [];
+
+    $contratosRmc = isset($dados['contratosRMC']) && is_array($dados['contratosRMC'])
+      ? $dados['contratosRMC']
+      : [];
+
+    $contratosRcc = isset($dados['contratosRCC']) && is_array($dados['contratosRCC'])
+      ? $dados['contratosRCC']
+      : [];
+
+    $renderRows = function (array $items, array $columns) use ($esc, $formatDate, $formatMoney): string {
+      $rowsHtml = '';
+
+      foreach ($items as $item) {
+        if (!is_array($item)) {
+          continue;
+        }
+
+        $rowsHtml .= '<tr>';
+
+        foreach ($columns as $columnKey) {
+          $columnValue = $item[$columnKey] ?? '—';
+
+          if (in_array($columnKey, ['dataInicio', 'dataFim'], true)) {
+            $columnValue = $formatDate($columnValue);
+          } elseif (in_array($columnKey, ['valorParcela', 'saldoDevedor', 'limite', 'valorReservado'], true)) {
+            $columnValue = $formatMoney($columnValue);
+          } else {
+            $columnValue = $esc($columnValue);
+          }
+
+          $rowsHtml .= '<td>' . $columnValue . '</td>';
+        }
+
+        $rowsHtml .= '</tr>';
+      }
+
+      if ($rowsHtml === '') {
+        $rowsHtml = '<tr><td colspan="' . count($columns) . '">Nenhum contrato encontrado.</td></tr>';
+      }
+
+      return $rowsHtml;
+    };
+
+    $emprestimoRows = $renderRows($contratosEmprestimo, [
+      'banco',
+      'numeroContrato',
+      'dataInicio',
+      'dataFim',
+      'valorParcela',
+      'saldoDevedor',
+      'situacao',
+    ]);
+
+    $rmcRows = $renderRows($contratosRmc, [
+      'banco',
+      'numeroContrato',
+      'limite',
+      'valorReservado',
+      'situacao',
+    ]);
+
+    $rccRows = $renderRows($contratosRcc, [
+      'banco',
+      'numeroContrato',
+      'limite',
+      'valorReservado',
+      'situacao',
+    ]);
+
+    $generatedAt = $fmtDateTime($row['created_at'] ?? current_time('mysql'));
+
+    return '<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <title>Consulta INSS</title>
+  <style>
+    body{
+      font-family: DejaVu Sans, sans-serif;
+      color:#1e293b;
+      font-size:12px;
+      line-height:1.45;
+      margin:24px;
+    }
+    .header{
+      border-bottom:2px solid #e2e8f0;
+      padding-bottom:12px;
+      margin-bottom:18px;
+    }
+    .title{
+      font-size:22px;
+      font-weight:bold;
+      color:#0f172a;
+      margin:0 0 4px 0;
+    }
+    .sub{
+      font-size:11px;
+      color:#64748b;
+    }
+    .section{
+      margin-bottom:18px;
+      page-break-inside: avoid;
+    }
+    .section-title{
+      font-size:14px;
+      font-weight:bold;
+      color:#0f172a;
+      background:#f8fafc;
+      border:1px solid #e2e8f0;
+      padding:8px 10px;
+      margin-bottom:10px;
+    }
+    .grid{
+      width:100%;
+      border-collapse:collapse;
+      margin-bottom:8px;
+    }
+    .grid td{
+      border:1px solid #e2e8f0;
+      padding:8px;
+      vertical-align:top;
+      width:50%;
+    }
+    .label{
+      font-size:10px;
+      color:#64748b;
+      display:block;
+      margin-bottom:2px;
+    }
+    .value{
+      font-size:12px;
+      color:#0f172a;
+      font-weight:bold;
+    }
+    table.data{
+      width:100%;
+      border-collapse:collapse;
+      margin-top:8px;
+    }
+    table.data th, table.data td{
+      border:1px solid #cbd5e1;
+      padding:7px;
+      font-size:11px;
+      text-align:left;
+    }
+    table.data th{
+      background:#f1f5f9;
+      color:#0f172a;
+    }
+    .footer{
+      margin-top:20px;
+      font-size:10px;
+      color:#64748b;
+      border-top:1px solid #e2e8f0;
+      padding-top:10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="title">Consulta INSS</div>
+    <div class="sub">Gerado em ' . esc_html($generatedAt) . '</div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Dados principais</div>
+    <table class="grid">
+      <tr>
+        <td><span class="label">Benefício</span><span class="value">' . $esc($beneficio) . '</span></td>
+        <td><span class="label">Nome</span><span class="value">' . $esc($nome) . '</span></td>
+      </tr>
+      <tr>
+        <td><span class="label">Situação</span><span class="value">' . $esc($situacao) . '</span></td>
+        <td><span class="label">Espécie</span><span class="value">' . $esc($especie) . '</span></td>
+      </tr>
+      <tr>
+        <td><span class="label">Bloqueio</span><span class="value">' . $esc($bloqueio) . '</span></td>
+        <td><span class="label">CPF</span><span class="value">' . $esc($cpf) . '</span></td>
+      </tr>
+      <tr>
+        <td><span class="label">NIT</span><span class="value">' . $esc($nit) . '</span></td>
+        <td><span class="label">Data de nascimento</span><span class="value">' . $esc($dataNascimento) . '</span></td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Dados administrativos</div>
+    <table class="grid">
+      <tr>
+        <td><span class="label">Órgão pagador</span><span class="value">' . $esc($orgaoPagador) . '</span></td>
+        <td><span class="label">Representante legal</span><span class="value">' . $esc($representanteLegal) . '</span></td>
+      </tr>
+      <tr>
+        <td><span class="label">UF agência</span><span class="value">' . $esc($ufAgencia) . '</span></td>
+        <td><span class="label">Código agência</span><span class="value">' . $esc($codigoAgencia) . '</span></td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Margens</div>
+    <table class="grid">
+      <tr>
+        <td><span class="label">Margem base</span><span class="value">' . $esc($margemBase) . '</span></td>
+        <td><span class="label">Margem disponível</span><span class="value">' . $esc($margemDisponivel) . '</span></td>
+      </tr>
+      <tr>
+        <td><span class="label">Margem RMC</span><span class="value">' . $esc($margemRmc) . '</span></td>
+        <td><span class="label">Margem RCC</span><span class="value">' . $esc($margemRcc) . '</span></td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Contratos de Empréstimo</div>
+    <table class="data">
+      <thead>
+        <tr>
+          <th>Banco</th>
+          <th>Contrato</th>
+          <th>Início</th>
+          <th>Fim</th>
+          <th>Parcela</th>
+          <th>Saldo devedor</th>
+          <th>Situação</th>
+        </tr>
+      </thead>
+      <tbody>' . $emprestimoRows . '</tbody>
+    </table>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Contratos RMC</div>
+    <table class="data">
+      <thead>
+        <tr>
+          <th>Banco</th>
+          <th>Contrato</th>
+          <th>Limite</th>
+          <th>Valor reservado</th>
+          <th>Situação</th>
+        </tr>
+      </thead>
+      <tbody>' . $rmcRows . '</tbody>
+    </table>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Contratos RCC</div>
+    <table class="data">
+      <thead>
+        <tr>
+          <th>Banco</th>
+          <th>Contrato</th>
+          <th>Limite</th>
+          <th>Valor reservado</th>
+          <th>Situação</th>
+        </tr>
+      </thead>
+      <tbody>' . $rccRows . '</tbody>
+    </table>
+  </div>
+
+  <div class="footer">
+    Documento gerado pelo ACME Account Control.
+  </div>
+</body>
+</html>';
+  }
+}
+
+add_action('wp_ajax_acme_inss_pdf_request', function () {
+  if (!is_user_logged_in()) {
+    wp_die('Você precisa estar logado.');
+  }
+
+  $nonce = isset($_GET['_wpnonce']) ? sanitize_text_field(wp_unslash($_GET['_wpnonce'])) : '';
+  if (!$nonce || !wp_verify_nonce($nonce, 'acme_inss_pdf_nonce')) {
+    wp_die('Token inválido.');
+  }
+
+  $requestId = isset($_GET['request_id']) ? sanitize_text_field(wp_unslash($_GET['request_id'])) : '';
+  if ($requestId === '') {
+    wp_die('request_id obrigatório.');
+  }
+
+  if (!function_exists('acme_pdf_stream_html')) {
+    wp_die('Função de PDF não disponível.');
+  }
+
+  global $wpdb;
+  $tableRequests = $wpdb->prefix . 'service_requests';
+
+  $currentUserId = get_current_user_id();
+  $currentUser = wp_get_current_user();
+
+  $isAdmin = current_user_can('manage_options');
+  $isMaster = function_exists('acme_user_has_role') && acme_user_has_role($currentUser, 'child');
+
+  if ($isAdmin) {
+    $row = $wpdb->get_row(
+      $wpdb->prepare(
+        "SELECT *
+         FROM {$tableRequests}
+         WHERE (request_id = %s OR provider_request_id = %s)
+           AND service_slug = %s
+         LIMIT 1",
+        $requestId,
+        $requestId,
+        'inss'
+      ),
+      ARRAY_A
+    );
+  } elseif ($isMaster && function_exists('acme_get_credit_table_visible_user_ids')) {
+    $visibleUserIds = acme_get_credit_table_visible_user_ids();
+    $visibleUserIds = array_values(array_unique(array_map('intval', (array) $visibleUserIds)));
+
+    if (empty($visibleUserIds)) {
+      $visibleUserIds = [$currentUserId];
+    }
+
+    $placeholders = implode(',', array_fill(0, count($visibleUserIds), '%d'));
+    $sql = "
+      SELECT *
+      FROM {$tableRequests}
+      WHERE (request_id = %s OR provider_request_id = %s)
+        AND service_slug = %s
+        AND user_id IN ({$placeholders})
+      LIMIT 1
+    ";
+
+    $params = array_merge([$requestId, $requestId, 'inss'], $visibleUserIds);
+
+    $row = $wpdb->get_row(
+      $wpdb->prepare($sql, $params),
+      ARRAY_A
+    );
+  } else {
+    $row = $wpdb->get_row(
+      $wpdb->prepare(
+        "SELECT *
+         FROM {$tableRequests}
+         WHERE (request_id = %s OR provider_request_id = %s)
+           AND service_slug = %s
+           AND user_id = %d
+         LIMIT 1",
+        $requestId,
+        $requestId,
+        'inss',
+        $currentUserId
+      ),
+      ARRAY_A
+    );
+  }
+
+  if (!$row) {
+    wp_die('Requisição INSS não encontrada.');
+  }
+
+  if (($row['status'] ?? '') !== 'completed') {
+    wp_die('Consulta ainda não foi concluída.');
+  }
+
+  $payload = json_decode($row['response_json'] ?? '{}', true);
+  if (!is_array($payload)) {
+    wp_die('response_json inválido.');
+  }
+
+  $dados = isset($payload['dados']) && is_array($payload['dados'])
+    ? $payload['dados']
+    : [];
+
+  if (empty($dados)) {
+    wp_die('Dados da consulta INSS não encontrados.');
+  }
+
+  $html = acme_inss_build_pdf_html($row, $dados);
+  acme_pdf_stream_html($html, 'consulta-inss-' . sanitize_file_name($requestId) . '.pdf');
+});

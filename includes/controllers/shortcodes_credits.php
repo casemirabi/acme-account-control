@@ -1850,10 +1850,26 @@ add_shortcode('acme_clt_panel', function () {
       }
     }
 
-    $pdf = '—';
-    if ($status === 'completed' && !empty($r['request_id']) && ($r['response_json'] ?? '') !== '') {
-      $pdf_url = admin_url('admin-ajax.php?action=acme_clt_pdf_request&_wpnonce=' . $nonce_pdf . '&request_id=' . rawurlencode($r['request_id']));
-      $pdf = '<a class="acme-btn" target="_blank" rel="noopener" href="' . esc_url($pdf_url) . '">Baixar PDF</a>';
+    $pdfCell = '—';
+
+    $requestId = $row['request_id'] ?? '';
+    $responseJson = $row['response_json'] ?? '';
+
+    if (!empty($requestId) && !empty($responseJson)) {
+
+      if ($status === 'completed') {
+
+        $pdfUrl = add_query_arg([
+          'action' => 'acme_inss_pdf_request',
+          '_wpnonce' => $noncePdf,
+          'request_id' => $requestId,
+        ], admin_url('admin-ajax.php'));
+
+        $pdfCell =
+          '<a class="acme-btn" target="_blank" rel="noopener" href="' .
+          esc_url($pdfUrl) .
+          '">Baixar PDF</a>';
+      }
     }
 
     $error = ($status === 'failed') ? "Houve um erro no processamento da consulta. \nRevise os dados, aguarde alguns instantes e tente novamente. Se o problema persistir, entre em contato com o administrador." : ''; //$error = $r['error_message'] ?? '';
@@ -2824,6 +2840,8 @@ add_shortcode('acme_inss_panel', function () {
     $visibleUserIds = [$currentUserId];
   }
 
+  $noncePdf = wp_create_nonce('acme_inss_pdf_nonce');
+
   // =========================
   // 0) PAGINAÇÃO
   // =========================
@@ -3112,7 +3130,7 @@ add_shortcode('acme_inss_panel', function () {
     $out .= '</div>';
   }
 
-    $out .= '<div class="acme-field">';
+  $out .= '<div class="acme-field">';
   $out .= '<label class="acme-muted">Benefício</label>';
   $out .= '<input class="acme-input" type="text" name="inss_beneficio" value="' . esc_attr($filterBeneficio) . '" placeholder="Ex.: 1234567890" />';
   $out .= '</div>';
@@ -3162,6 +3180,8 @@ add_shortcode('acme_inss_panel', function () {
     return $out;
   }
 
+
+
   // =========================
   // 9) TABELA
   // =========================
@@ -3181,24 +3201,29 @@ add_shortcode('acme_inss_panel', function () {
   $out .= '<th>Bloqueio</th>';
   $out .= '<th>Status</th>';
   $out .= '<th>Erro</th>';
+  $out .= '<th>PDF</th>';
   $out .= '</tr></thead><tbody>';
 
+
   foreach ($rows as $row) {
-    $status = $row['status'] ?? 'pending';
+
+    $status = isset($row['status']) ? (string) $row['status'] : 'pending';
+    $statusNormalized = strtolower(trim($status));
+
     $createdAt = $row['created_at'] ?? '';
     $createdAt = $createdAt ? date_i18n('d/m/Y H:i', strtotime($createdAt)) : '';
 
     $badgeClass = 'acme-badge-pending';
-    if ($status === 'completed') {
+    if (in_array($statusNormalized, ['completed', 'complete', 'ok', 'success', 'done'], true)) {
       $badgeClass = 'acme-badge-completed';
-    } elseif ($status === 'failed') {
+    } elseif ($statusNormalized === 'failed') {
       $badgeClass = 'acme-badge-failed';
     }
 
     $statusLabel = 'Pendente';
-    if ($status === 'completed') {
+    if (in_array($statusNormalized, ['completed', 'complete', 'ok', 'success', 'done'], true)) {
       $statusLabel = 'Completo';
-    } elseif ($status === 'failed') {
+    } elseif ($statusNormalized === 'failed') {
       $statusLabel = 'Falha';
     }
 
@@ -3216,6 +3241,7 @@ add_shortcode('acme_inss_panel', function () {
 
       if (is_array($decoded)) {
         $dados = $decoded['dados'] ?? [];
+
         $nome = $dados['nome'] ?? '—';
         $especie = $dados['especie']['descricao'] ?? '—';
         $situacao = $dados['situacao'] ?? '—';
@@ -3233,10 +3259,38 @@ add_shortcode('acme_inss_panel', function () {
     }
 
     $errorMessage = '';
-    if ($status === 'failed') {
-      $errorMessage = $row['error_message'] ?: 'Houve um erro no processamento da consulta.';
+    if ($statusNormalized === 'failed') {
+      $errorMessage = !empty($row['error_message'])
+        ? $row['error_message']
+        : 'Houve um erro no processamento da consulta.';
     }
 
+    // =========================
+    // PDF
+    // =========================
+    $pdfCell = '—';
+
+    $requestId = $row['request_id'] ?? '';
+
+    $isCompletedStatus = in_array($statusNormalized, ['completed', 'complete', 'ok', 'success', 'done'], true);
+
+    if (
+      $isCompletedStatus &&
+      !empty($requestId) &&
+      !empty($responseJson)
+    ) {
+      $pdfUrl = add_query_arg([
+        'action'    => 'acme_inss_pdf_request',
+        '_wpnonce'  => $noncePdf,
+        'request_id' => $requestId,
+      ], admin_url('admin-ajax.php'));
+
+      $pdfCell = '<a class="acme-btn" target="_blank" rel="noopener" href="' . esc_url($pdfUrl) . '">Baixar PDF</a>';
+    }
+
+    // =========================
+    // ROW
+    // =========================
     $out .= '<tr>';
     $out .= '<td class="acme-muted">' . esc_html($createdAt) . '</td>';
 
@@ -3251,6 +3305,7 @@ add_shortcode('acme_inss_panel', function () {
     $out .= '<td>' . esc_html($bloqueio) . '</td>';
     $out .= '<td><span class="acme-badge ' . esc_attr($badgeClass) . '">' . esc_html($statusLabel) . '</span></td>';
     $out .= '<td class="acme-col-error">' . esc_html($errorMessage) . '</td>';
+    $out .= '<td>' . $pdfCell . '</td>';
     $out .= '</tr>';
   }
 
