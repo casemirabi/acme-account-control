@@ -1395,10 +1395,20 @@ if (!function_exists('acme_ui_panel_css')) {
 
 /* 🔽 ADICIONE ISSO AQUI */
 .acme-col-error{
-  max-width:250px;
+  width:220px;
+  max-width:220px;
+  min-width:220px;
   white-space:normal;
   word-break:break-word;
-  overflow-wrap:anywhere;
+  overflow-wrap:break-word;
+}
+
+.acme-col-error .acme-error-text{
+  display:-webkit-box;
+  -webkit-line-clamp:3;
+  -webkit-box-orient:vertical;
+  overflow:hidden;
+  line-height:1.45;
 }
 
 </style>';

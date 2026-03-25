@@ -3195,7 +3195,7 @@ add_shortcode('acme_inss_panel', function () {
   $out .= '<th>Situação</th>';
   $out .= '<th>Bloqueio</th>';
   $out .= '<th>Status</th>';
-  $out .= '<th>Erro</th>';
+  $out .= '<th class="acme-col-error">Situação (Se erro)</th>';
   $out .= '<th>PDF</th>';
   $out .= '</tr></thead><tbody>';
 
