@@ -421,13 +421,13 @@ function acme_api_clt_start(WP_REST_Request $req)
 
     // failed
     if (($row['status'] ?? '') === 'failed') {
-  $base['waited'] = true;
-  $base['status'] = 'failed';
-  $base['provider_request_id'] = $row['provider_request_id'] ?? null;
-  $base['message'] = 'Consulta CLT falhou.';
-  $base['error'] = acme_clt_public_failed_error();
-  return acme_ok($base, 200);
-}
+      $base['waited'] = true;
+      $base['status'] = 'failed';
+      $base['provider_request_id'] = $row['provider_request_id'] ?? null;
+      $base['message'] = 'Consulta CLT falhou.';
+      $base['error'] = acme_clt_public_failed_error();
+      return acme_ok($base, 200);
+    }
   }
 
   // Retorno normal (pending)
@@ -519,6 +519,8 @@ if (!function_exists('acme_clt_build_public_status_response')) {
           'registroEmpregaticio' => $margem['registroEmpregaticio'] ?? null,
           'cnpjEmpregador' => $margem['cnpjEmpregador'] ?? null,
           'dataAdmissao' => $margem['dataAdmissao'] ?? null,
+          'dataNascimento' => $margem['dataNascimento'] ?? null,
+          'sexo' => $margem['sexo'] ?? null,
         ],
         'propostas' => !empty($propostasPublicas)
           ? $propostasPublicas
@@ -603,8 +605,8 @@ function acme_api_clt_status(WP_REST_Request $req)
   }
 
   if ($row['status'] === 'failed') {
-  $data['error'] = acme_clt_public_failed_error();
-}
+    $data['error'] = acme_clt_public_failed_error();
+  }
 
   return acme_ok([
     'success' => true,

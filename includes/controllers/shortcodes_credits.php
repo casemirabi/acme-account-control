@@ -1852,24 +1852,19 @@ add_shortcode('acme_clt_panel', function () {
 
     $pdfCell = '—';
 
-    $requestId = $row['request_id'] ?? '';
-    $responseJson = $row['response_json'] ?? '';
+    $requestId = $r['request_id'] ?? '';
+    $responseJson = $r['response_json'] ?? '';
 
-    if (!empty($requestId) && !empty($responseJson)) {
+    if (!empty($requestId) && !empty($responseJson) && $status === 'completed') {
+      $pdfUrl = add_query_arg([
+        'action' => 'acme_clt_pdf_request',
+        '_wpnonce' => $nonce_pdf,
+        'request_id' => $requestId,
+      ], admin_url('admin-ajax.php'));
 
-      if ($status === 'completed') {
-
-        $pdfUrl = add_query_arg([
-          'action' => 'acme_inss_pdf_request',
-          '_wpnonce' => $noncePdf,
-          'request_id' => $requestId,
-        ], admin_url('admin-ajax.php'));
-
-        $pdfCell =
-          '<a class="acme-btn" target="_blank" rel="noopener" href="' .
-          esc_url($pdfUrl) .
-          '">Baixar PDF</a>';
-      }
+      $pdfCell = '<a class="acme-btn" target="_blank" rel="noopener" href="'
+        . esc_url($pdfUrl)
+        . '">Baixar PDF</a>';
     }
 
     $error = ($status === 'failed') ? "Houve um erro no processamento da consulta. \nRevise os dados, aguarde alguns instantes e tente novamente. Se o problema persistir, entre em contato com o administrador." : ''; //$error = $r['error_message'] ?? '';
@@ -1884,7 +1879,7 @@ add_shortcode('acme_clt_panel', function () {
     $out .= '<td class="acme-muted">' . esc_html($elegibilidade) . '</td>';
     $out .= '<td><span class="acme-badge ' . esc_attr($badgeClass) . '">' . esc_html($status_valor) . '</span></td>';
     $out .= '<td class="acme-col-error">' . esc_html($error) . '</td>'; //$out .= '<td>' . esc_html($error) . '</td>';
-    $out .= '<td>' . $pdf . '</td>';
+    $out .= '<td>' . $pdfCell . '</td>';
     $out .= '</tr>';
   }
 

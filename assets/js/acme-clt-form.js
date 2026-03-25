@@ -166,9 +166,23 @@ function clearLastResult() {
     return n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   }
 
-  function fmtDate(iso) {
+  /*function fmtDate(iso) {
     if (!iso) return '—';
     const d = new Date(iso);
+    if (isNaN(d.getTime())) return '—';
+    return d.toLocaleDateString('pt-BR');
+  }*/
+  function fmtDate(iso) {
+    if (!iso) return '—';
+
+    const value = String(iso).trim();
+    const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+
+    if (match) {
+      return `${match[3]}/${match[2]}/${match[1]}`;
+    }
+
+    const d = new Date(value);
     if (isNaN(d.getTime())) return '—';
     return d.toLocaleDateString('pt-BR');
   }
@@ -253,7 +267,7 @@ function clearLastResult() {
   }
 
   // detecta se há simulações (capturedResponse.body) e retorna array parseado
-  function extractSimulacoes(root) {
+  /*function extractSimulacoes(root) {
     try {
       const body =
         root &&
@@ -261,6 +275,28 @@ function clearLastResult() {
         root.propostas.capturedResponse &&
         root.propostas.capturedResponse.body;
       if (!body) return null;
+      const arr = JSON.parse(body);
+      return Array.isArray(arr) ? arr : null;
+    } catch (e) {
+      return null;
+    }
+  }*/
+  function extractSimulacoes(root) {
+    try {
+      if (!root || typeof root !== 'object') return null;
+
+      if (Array.isArray(root.propostas)) {
+        return root.propostas;
+      }
+
+      const body =
+        root &&
+        root.propostas &&
+        root.propostas.capturedResponse &&
+        root.propostas.capturedResponse.body;
+
+      if (!body) return null;
+
       const arr = JSON.parse(body);
       return Array.isArray(arr) ? arr : null;
     } catch (e) {
@@ -293,12 +329,14 @@ function clearLastResult() {
       root && root.margem && typeof root.margem === 'object' ? root.margem : {};
 
     const nome = showNome(root && root.nome ? root.nome : '');
-    const cpf = maskCpfAny(root && root.cpf ? root.cpf : '');
+    const cpf = root && (root.cpf || root.numeroDocumento)
+      ? String(root.cpf || root.numeroDocumento)
+      : '—';
     const valorMargemDisponivel = fmtMoney(margem.valorMargemDisponivel);
     const valorMargemBase = fmtMoney(margem.valorMargemBase);
-    const dataNascimento = fmtDate(margem.dataNascimento);
-    const sexo = sexoLabel(margem.sexo);
-    const dataAdmissao = fmtDate(margem.dataAdmissao);
+    const dataNascimento = fmtDate(margem && margem.dataNascimento ? margem.dataNascimento : '');
+    const sexo = sexoLabel(margem && margem.sexo ? margem.sexo : '');
+    const dataAdmissao = fmtDate(margem && margem.dataAdmissao ? margem.dataAdmissao : '');
 
     const elegivel = hasEligible(vinculos);
     const badgeClass = elegivel
@@ -439,10 +477,10 @@ function clearLastResult() {
               <div class="acme-value">${nome}</div>
             </div>
 
-            <div class="acme-field">
-              <div class="acme-label">CPF</div>
-              <div class="acme-value">${cpf}</div>
-            </div>
+          <div class="acme-field">
+            <div class="acme-label">CPF</div>
+            <div class="acme-value">${cpf}</div>
+          </div>
 
             <div class="acme-field">
               <div class="acme-label">Margem disponível</div>
@@ -471,7 +509,7 @@ function clearLastResult() {
 
             <div class="acme-field">
               <div class="acme-label">Status</div>
-              <div class="acme-value">COMPLETED</div>
+              <div class="acme-value">Completo</div>
             </div>
           </div>
 

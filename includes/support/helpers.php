@@ -470,6 +470,8 @@ add_action('wp_enqueue_scripts', function () {
       'restStart'  => rest_url('acme/v1/api-inss'),
       'restStatus' => rest_url('acme/v1/api-inss-status'),
       'restNonce'  => wp_create_nonce('wp_rest'),
+      'pdfUrl'     => admin_url('admin-ajax.php?action=acme_inss_pdf_request&_wpnonce=' . wp_create_nonce('acme_inss_pdf_nonce')),
+
     ]);
   }
 });
@@ -937,7 +939,7 @@ add_action('wp_ajax_acme_inss_pdf_request', function () {
     wp_die('response_json inválido.');
   }
 
-  $dados = [];
+  /*$dados = [];
   if (isset($payload['dados']) && is_array($payload['dados'])) {
     $dados = $payload['dados'];
   }
@@ -947,6 +949,18 @@ add_action('wp_ajax_acme_inss_pdf_request', function () {
   }
 
   $html = acme_inss_build_pdf_html($row, $dados);
+  */
+  $dados = [];
+  if (isset($payload['dados']) && is_array($payload['dados'])) {
+    $dados = $payload;
+  }
+
+  if (empty($dados)) {
+    wp_die('Dados da consulta INSS não encontrados.');
+  }
+
+  $html = acme_inss_build_pdf_html($row, $dados);
+
   acme_pdf_stream_html($html, 'consulta-inss-' . $requestId . '.pdf');
 });
 
@@ -1743,28 +1757,59 @@ if (!function_exists('acme_inss_build_pdf_html')) {
       return '—';
     };
 
-    $beneficio = (string) ($row['cpf_masked'] ?? '—');
-    $nome = (string) ($dados['nome'] ?? '—');
-    $situacao = (string) ($dados['situacao'] ?? '—');
-    $especie = (string) ($dados['especie']['descricao'] ?? '—');
-    $bloqueio = $boolLabel(
-      $dados['bloqueioEmprestimo']
-      ?? $dados['bloqueioEmprestismo']
-      ?? null
+    $dadosBase = isset($dados['dados']) && is_array($dados['dados'])
+      ? $dados['dados']
+      : $dados;
+
+    $beneficio = (string) (
+      $row['numeroDocumento']
+      ?? $dadosBase['beneficio']
+      ?? $row['cpf_masked']
+      ?? '—'
     );
 
-    $cpf = (string) ($dados['cpf'] ?? '—');
-    $nit = (string) ($dados['nit'] ?? '—');
-    $dataNascimento = $formatDate($dados['dataNascimento'] ?? '');
-    $orgaoPagador = (string) ($dados['orgaoPagador'] ?? '—');
-    $ufAgencia = (string) ($dados['ufAgencia'] ?? '—');
-    $codigoAgencia = (string) ($dados['codigoAgencia'] ?? '—');
-    $representanteLegal = (string) ($dados['representanteLegal'] ?? '—');
+    $nome = (string) ($dadosBase['nome'] ?? '—');
 
-    $margemBase = $dados['margemBase'] ?? '—';
-    $margemDisponivel = $dados['margemDisponivel'] ?? '—';
-    $margemRmc = $dados['margemRmc'] ?? '—';
-    $margemRcc = $dados['margemRcc'] ?? '—';
+    $situacao = (string) ($dadosBase['situacao'] ?? '—');
+
+    $especie = (string) (
+      $dadosBase['especie']['descricao']
+      ?? $dadosBase['especie']
+      ?? '—'
+    );
+
+    $bloqueio = $boolLabel(
+      $dadosBase['bloqueioEmprestimo']
+        ?? $dadosBase['bloqueioEmprestismo']
+        ?? null
+    );
+
+    $motivoBloqueio = (string) (
+      $dadosBase['motivoBloqueio']
+      ?? $dadosBase['motivo']
+      ?? '—'
+    );
+
+    $orgaoPagador = (string) (
+      $dadosBase['banco']['descricao']
+      ?? $dadosBase['orgaoPagador']
+      ?? '—'
+    );
+
+    $codigoAgencia = (string) (
+      $dadosBase['agencia']
+      ?? $dadosBase['codigoAgencia']
+      ?? '—'
+    );
+
+
+    /*
+ * Margens reais do provider atual
+ */
+    $margemBase = $dadosBase['valorBase'] ?? '—';
+    $margemDisponivel = $dadosBase['margemDisponivelEmprestimo'] ?? '—';
+    $margemRmc = $dadosBase['margemReservadaRMC'] ?? '—';
+    $margemRcc = $dadosBase['margemReservadaRCC'] ?? '—';
 
     $contratosEmprestimo = isset($dados['contratosEmprestimo']) && is_array($dados['contratosEmprestimo'])
       ? $dados['contratosEmprestimo']
@@ -1790,6 +1835,28 @@ if (!function_exists('acme_inss_build_pdf_html')) {
 
         foreach ($columns as $columnKey) {
           $columnValue = $item[$columnKey] ?? '—';
+
+          if ($columnKey === 'banco') {
+            $columnValue = is_array($item['banco'] ?? null)
+              ? ($item['banco']['descricao'] ?? '—')
+              : ($item['banco'] ?? '—');
+          }
+
+          if ($columnKey === 'numeroContrato' && $columnValue === '—') {
+            $columnValue = $item['contrato'] ?? '—';
+          }
+
+          if ($columnKey === 'dataInicio' && $columnValue === '—') {
+            $columnValue = $item['dataInclusao'] ?? '—';
+          }
+
+          if ($columnKey === 'limite' && $columnValue === '—') {
+            $columnValue = $item['valorLimiteCartao'] ?? '—';
+          }
+
+          if ($columnKey === 'saldoDevedor' && $columnValue === '—') {
+            $columnValue = $item['valorEmprestado'] ?? '—';
+          }
 
           if (in_array($columnKey, ['dataInicio', 'dataFim'], true)) {
             $columnValue = $formatDate($columnValue);
@@ -1840,201 +1907,246 @@ if (!function_exists('acme_inss_build_pdf_html')) {
 
     $generatedAt = $fmtDateTime($row['created_at'] ?? current_time('mysql'));
 
-    return '<!doctype html>
+    return '
+<!doctype html>
 <html lang="pt-BR">
 <head>
-  <meta charset="utf-8">
-  <title>Consulta INSS</title>
-  <style>
-    body{
-      font-family: DejaVu Sans, sans-serif;
-      color:#1e293b;
-      font-size:12px;
-      line-height:1.45;
-      margin:24px;
-    }
-    .header{
-      border-bottom:2px solid #e2e8f0;
-      padding-bottom:12px;
-      margin-bottom:18px;
-    }
-    .title{
-      font-size:22px;
-      font-weight:bold;
-      color:#0f172a;
-      margin:0 0 4px 0;
-    }
-    .sub{
-      font-size:11px;
-      color:#64748b;
-    }
-    .section{
-      margin-bottom:18px;
-      page-break-inside: avoid;
-    }
-    .section-title{
-      font-size:14px;
-      font-weight:bold;
-      color:#0f172a;
-      background:#f8fafc;
-      border:1px solid #e2e8f0;
-      padding:8px 10px;
-      margin-bottom:10px;
-    }
-    .grid{
-      width:100%;
-      border-collapse:collapse;
-      margin-bottom:8px;
-    }
-    .grid td{
-      border:1px solid #e2e8f0;
-      padding:8px;
-      vertical-align:top;
-      width:50%;
-    }
-    .label{
-      font-size:10px;
-      color:#64748b;
-      display:block;
-      margin-bottom:2px;
-    }
-    .value{
-      font-size:12px;
-      color:#0f172a;
-      font-weight:bold;
-    }
-    table.data{
-      width:100%;
-      border-collapse:collapse;
-      margin-top:8px;
-    }
-    table.data th, table.data td{
-      border:1px solid #cbd5e1;
-      padding:7px;
-      font-size:11px;
-      text-align:left;
-    }
-    table.data th{
-      background:#f1f5f9;
-      color:#0f172a;
-    }
-    .footer{
-      margin-top:20px;
-      font-size:10px;
-      color:#64748b;
-      border-top:1px solid #e2e8f0;
-      padding-top:10px;
-    }
-  </style>
+<meta charset="utf-8">
+<title>Consulta INSS</title>
+<style>
+  body{
+    font-family: DejaVu Sans, Arial, sans-serif;
+    font-size:12px;
+    color:#111;
+    margin:16px;
+  }
+
+  .topbar{
+    background:#0b4ea2;
+    height:34px;
+    margin:-16px -16px 14px -16px;
+  }
+
+  .title{
+    text-align:center;
+    font-size:22px;
+    font-weight:700;
+    letter-spacing:0.5px;
+    margin:10px 0 6px;
+    color:#111;
+  }
+
+  .subtitle{
+    text-align:center;
+    font-size:13px;
+    margin:0 0 12px;
+    color:#333;
+  }
+
+  .card{
+    border:1px solid #d6d6d6;
+    border-radius:8px;
+    margin:12px 0;
+    overflow:hidden;
+  }
+
+  .card-h{
+    background:#e9ecef;
+    padding:10px 12px;
+    font-weight:700;
+    color:#111;
+  }
+
+  .card-b{
+    padding:12px;
+  }
+
+  .grid{
+    width:100%;
+    border-collapse:collapse;
+  }
+
+  .grid td{
+    vertical-align:top;
+    padding:4px 6px;
+  }
+
+  .label{
+    color:#333;
+    font-weight:700;
+  }
+
+  .badge{
+    display:inline-block;
+    padding:4px 10px;
+    border-radius:12px;
+    font-weight:700;
+    line-height:1.2;
+    vertical-align:middle;
+    position:relative;
+    top:1px;
+  }
+
+  .badge-ok{
+    background:#e8fff0;
+    color:#0a7a2f;
+  }
+
+  .badge-no{
+    background:#fff0f0;
+    color:#b00020;
+  }
+
+  table.tbl{
+    width:100%;
+    border-collapse:collapse;
+    table-layout:fixed;
+    font-size:9.5px;
+  }
+
+  .tbl th,
+  .tbl td{
+    border:1px solid #222;
+    padding:6px;
+    vertical-align:top;
+    white-space:normal;
+    word-break:break-word;
+    overflow-wrap:anywhere;
+  }
+
+  .tbl th{
+    background:#e9ecef;
+    font-weight:700;
+    color:#111;
+  }
+
+  .footer{
+    position:fixed;
+    bottom:10px;
+    left:0;
+    right:0;
+    font-size:10px;
+    color:#333;
+  }
+
+  .footer .r{
+    float:right;
+  }
+</style>
 </head>
 <body>
-  <div class="header">
-    <div class="title">Consulta INSS</div>
-    <div class="sub">Gerado em ' . esc_html($generatedAt) . '</div>
-  </div>
+  <div class="topbar"></div>
 
-  <div class="section">
-    <div class="section-title">Dados principais</div>
-    <table class="grid">
-      <tr>
-        <td><span class="label">Benefício</span><span class="value">' . $esc($beneficio) . '</span></td>
-        <td><span class="label">Nome</span><span class="value">' . $esc($nome) . '</span></td>
-      </tr>
-      <tr>
-        <td><span class="label">Situação</span><span class="value">' . $esc($situacao) . '</span></td>
-        <td><span class="label">Espécie</span><span class="value">' . $esc($especie) . '</span></td>
-      </tr>
-      <tr>
-        <td><span class="label">Bloqueio</span><span class="value">' . $esc($bloqueio) . '</span></td>
-        <td><span class="label">CPF</span><span class="value">' . $esc($cpf) . '</span></td>
-      </tr>
-      <tr>
-        <td><span class="label">NIT</span><span class="value">' . $esc($nit) . '</span></td>
-        <td><span class="label">Data de nascimento</span><span class="value">' . $esc($dataNascimento) . '</span></td>
-      </tr>
-    </table>
-  </div>
+  <div class="title">CONSULTA INSS</div>
+  <div class="subtitle">' . $esc($nome) . ' • Benefício: ' . $esc($beneficio) . '</div>
 
-  <div class="section">
-    <div class="section-title">Dados administrativos</div>
-    <table class="grid">
-      <tr>
-        <td><span class="label">Órgão pagador</span><span class="value">' . $esc($orgaoPagador) . '</span></td>
-        <td><span class="label">Representante legal</span><span class="value">' . $esc($representanteLegal) . '</span></td>
-      </tr>
-      <tr>
-        <td><span class="label">UF agência</span><span class="value">' . $esc($ufAgencia) . '</span></td>
-        <td><span class="label">Código agência</span><span class="value">' . $esc($codigoAgencia) . '</span></td>
-      </tr>
-    </table>
-  </div>
-
-  <div class="section">
-    <div class="section-title">Margens</div>
-    <table class="grid">
-      <tr>
-        <td><span class="label">Margem base</span><span class="value">' . $esc($margemBase) . '</span></td>
-        <td><span class="label">Margem disponível</span><span class="value">' . $esc($margemDisponivel) . '</span></td>
-      </tr>
-      <tr>
-        <td><span class="label">Margem RMC</span><span class="value">' . $esc($margemRmc) . '</span></td>
-        <td><span class="label">Margem RCC</span><span class="value">' . $esc($margemRcc) . '</span></td>
-      </tr>
-    </table>
-  </div>
-
-  <div class="section">
-    <div class="section-title">Contratos de Empréstimo</div>
-    <table class="data">
-      <thead>
+  <div class="card">
+    <div class="card-h">Resumo</div>
+    <div class="card-b">
+      <table class="grid">
         <tr>
-          <th>Banco</th>
-          <th>Contrato</th>
-          <th>Início</th>
-          <th>Fim</th>
-          <th>Parcela</th>
-          <th>Saldo devedor</th>
-          <th>Situação</th>
+          <td width="60%">
+            <div><span class="label">Nome:</span> ' . $esc($nome) . '</div>
+            <div><span class="label">Benefício:</span> ' . $esc($beneficio) . '</div>
+            <div><span class="label">Espécie:</span> ' . $esc($especie) . '</div>
+            <div><span class="label">Situação:</span> ' . $esc($situacao) . '</div>
+            <div><span class="label">Bloqueio:</span>
+              <span class="badge ' . (($bloqueio === 'Sim') ? 'badge-no' : 'badge-ok') . '">' . $esc($bloqueio) . '</span>
+            </div>
+          </td>
+          <td width="40%">
+            <div><span class="label">Motivo bloqueio:</span> ' . $esc($motivoBloqueio) . '</div>
+            <div><span class="label">Órgão pagador:</span> ' . $esc($orgaoPagador) . '</div>
+            <div><span class="label">Agência:</span> ' . $esc($codigoAgencia) . '</div>
+            <div><span class="label">Margem base:</span> ' . $esc($formatMoney($margemBase)) . '</div>
+            <div><span class="label">Margem disponível:</span> ' . $esc($formatMoney($margemDisponivel)) . '</div>
+          </td>
         </tr>
-      </thead>
-      <tbody>' . $emprestimoRows . '</tbody>
-    </table>
+      </table>
+    </div>
   </div>
 
-  <div class="section">
-    <div class="section-title">Contratos RMC</div>
-    <table class="data">
-      <thead>
+  <div class="card">
+    <div class="card-h">Margens complementares</div>
+    <div class="card-b">
+      <table class="grid">
         <tr>
-          <th>Banco</th>
-          <th>Contrato</th>
-          <th>Limite</th>
-          <th>Valor reservado</th>
-          <th>Situação</th>
+          <td width="50%">
+            <div><span class="label">Margem RMC:</span> ' . $esc($formatMoney($margemRmc)) . '</div>
+          </td>
+          <td width="50%">
+            <div><span class="label">Margem RCC:</span> ' . $esc($formatMoney($margemRcc)) . '</div>
+          </td>
         </tr>
-      </thead>
-      <tbody>' . $rmcRows . '</tbody>
-    </table>
+      </table>
+    </div>
   </div>
 
-  <div class="section">
-    <div class="section-title">Contratos RCC</div>
-    <table class="data">
-      <thead>
-        <tr>
-          <th>Banco</th>
-          <th>Contrato</th>
-          <th>Limite</th>
-          <th>Valor reservado</th>
-          <th>Situação</th>
-        </tr>
-      </thead>
-      <tbody>' . $rccRows . '</tbody>
-    </table>
+  <div class="card">
+    <div class="card-h">Contratos de Empréstimo (' . count((array) $contratosEmprestimo) . ')</div>
+    <div class="card-b">
+      <table class="tbl">
+        <thead>
+          <tr>
+            <th style="width:24%;">Banco</th>
+            <th style="width:18%;">Contrato</th>
+            <th style="width:14%;">Inclusão</th>
+            <th style="width:14%;">Parcela</th>
+            <th style="width:16%;">Valor</th>
+            <th style="width:14%;">Situação</th>
+          </tr>
+        </thead>
+        <tbody>' . $renderRows($contratosEmprestimo, [
+      'banco',
+      'numeroContrato',
+      'dataInicio',
+      'valorParcela',
+      'saldoDevedor',
+      'situacao',
+    ]) . '</tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-h">Contratos RMC (' . count((array) $contratosRmc) . ')</div>
+    <div class="card-b">
+      <table class="tbl">
+        <thead>
+          <tr>
+            <th style="width:34%;">Banco</th>
+            <th style="width:20%;">Contrato</th>
+            <th style="width:18%;">Limite</th>
+            <th style="width:14%;">Reservado</th>
+            <th style="width:14%;">Situação</th>
+          </tr>
+        </thead>
+        <tbody>' . $rmcRows . '</tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-h">Contratos RCC (' . count((array) $contratosRcc) . ')</div>
+    <div class="card-b">
+      <table class="tbl">
+        <thead>
+          <tr>
+            <th style="width:34%;">Banco</th>
+            <th style="width:20%;">Contrato</th>
+            <th style="width:18%;">Limite</th>
+            <th style="width:14%;">Reservado</th>
+            <th style="width:14%;">Situação</th>
+          </tr>
+        </thead>
+        <tbody>' . $rccRows . '</tbody>
+      </table>
+    </div>
   </div>
 
   <div class="footer">
-    Documento gerado pelo ACME Account Control.
+    <span>Gerado por Meu Consignado</span>
+    <span class="r">' . esc_html($generatedAt) . '</span>
   </div>
 </body>
 </html>';
@@ -2124,6 +2236,8 @@ add_action('wp_ajax_acme_inss_pdf_request', function () {
       ARRAY_A
     );
   }
+
+
 
   if (!$row) {
     wp_die('Requisição INSS não encontrada.');

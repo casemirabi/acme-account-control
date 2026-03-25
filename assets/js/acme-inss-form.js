@@ -195,168 +195,185 @@ function acmeInssClearLastResult() {
 
   // Renderiza o resultado de sucesso da consulta.
   // Recebe os dados e opcionalmente o requestId.
+
   function renderSuccess(data, requestId = '') {
-    // Alguns retornos vêm em data.response_data, outros já vêm direto em data.
-    const responseData = data?.response_data || data || {};
+  // Alguns retornos vêm em data.response_data, outros já vêm direto em data.
+  const responseData = data?.response_data || data || {};
 
-    // "dados" parece ser o núcleo principal do retorno.
-    const dados = responseData?.dados || {};
+  // "dados" parece ser o núcleo principal do retorno.
+  const dados = responseData?.dados || {};
 
-    // Extrai campos com fallback para '-'
-    const nome = dados?.nome || '-';
-    const beneficio = dados?.beneficio || '-';
-    const situacao = dados?.situacao || '-';
-    const especie = dados?.especie?.descricao || '-';
+  // Extrai campos com fallback para '-'
+  const nome = dados?.nome || '-';
+  const beneficio = dados?.beneficio || '-';
+  const situacao = dados?.situacao || '-';
+  const especie = dados?.especie?.descricao || '-';
 
-    // Booleano convertido para texto amigável.
-    const elegivel = dados?.elegivelEmprestimo ? 'Sim' : 'Não';
+  // Booleano convertido para texto amigável.
+  const elegivel = dados?.elegivelEmprestimo ? 'Sim' : 'Não';
 
-    // Aqui existe tolerância a nome de campo com possível erro de digitação:
-    // bloqueioEmprestimo ou bloqueioEmprestismo
-    const bloqueioBruto =
-      dados?.bloqueioEmprestimo ??
-      dados?.bloqueioEmprestismo ??
-      false;
+  // Aqui existe tolerância a nome de campo com possível erro de digitação:
+  // bloqueioEmprestimo ou bloqueioEmprestismo
+  const bloqueioBruto =
+    dados?.bloqueioEmprestimo ??
+    dados?.bloqueioEmprestismo ??
+    false;
 
-    const bloqueio = bloqueioBruto ? 'Sim' : 'Não';
+  const bloqueio = bloqueioBruto ? 'Sim' : 'Não';
 
-    const banco = dados?.banco?.descricao || '-';
-    const agencia = dados?.agencia || '-';
-    const conta = dados?.conta || '-';
+  const banco = dados?.banco?.descricao || '-';
+  const agencia = dados?.agencia || '-';
+  const conta = dados?.conta || '-';
 
-    const valorBase = dados?.valorBase ?? '-';
-    const margem = dados?.margemConsignavel ?? '-';
+  const valorBase = dados?.valorBase ?? '-';
+  const margem = dados?.margemConsignavel ?? '-';
 
-    // Variável que vai acumular o HTML dos contratos.
-    let contratosHtml = '';
+  const pdfButtonHtml =
+    requestId && window.ACME_INSS?.pdfUrl
+      ? `
+        <a
+          href="${window.ACME_INSS.pdfUrl}&request_id=${encodeURIComponent(requestId)}"
+          class="acme-btn"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Baixar PDF
+        </a>
+      `
+      : '';
 
-    // Tenta localizar lista de contratos em mais de um ponto da estrutura,
-    // porque a API aparentemente pode responder em formatos diferentes.
-    const contratosEmprestimo = Array.isArray(responseData?.contratosEmprestimo)
-      ? responseData.contratosEmprestimo
-      : (Array.isArray(dados?.contratosEmprestimo) ? dados.contratosEmprestimo : []);
+  // Variável que vai acumular o HTML dos contratos.
+  let contratosHtml = '';
 
-    const contratosRMC = Array.isArray(responseData?.contratosRMC)
-      ? responseData.contratosRMC
-      : (Array.isArray(dados?.contratosRMC) ? dados.contratosRMC : []);
+  // Tenta localizar lista de contratos em mais de um ponto da estrutura,
+  // porque a API aparentemente pode responder em formatos diferentes.
+  const contratosEmprestimo = Array.isArray(responseData?.contratosEmprestimo)
+    ? responseData.contratosEmprestimo
+    : (Array.isArray(dados?.contratosEmprestimo) ? dados.contratosEmprestimo : []);
 
-    const contratosRCC = Array.isArray(responseData?.contratosRCC)
-      ? responseData.contratosRCC
-      : (Array.isArray(dados?.contratosRCC) ? dados.contratosRCC : []);
+  const contratosRMC = Array.isArray(responseData?.contratosRMC)
+    ? responseData.contratosRMC
+    : (Array.isArray(dados?.contratosRMC) ? dados.contratosRMC : []);
 
-    // Monta o HTML dos contratos de empréstimo consignado.
-    contratosEmprestimo.forEach((contratoData) => {
-      contratosHtml += `
-        <div class="acme-field acme-inss-contrato">
-          <div class="acme-label">${contratoData?.tipoEmprestimo || 'Empréstimo consignado'}</div>
-          <div class="acme-value">${contratoData?.contrato || '-'}</div>
-          <div class="acme-muted">
-            Banco: ${contratoData?.banco?.descricao || '-'}<br>
-            Parcelas: ${contratoData?.quantidadeParcelas ?? '-'}<br>
-            Parcela: ${contratoData?.valorParcela ?? '-'}<br>
-            Situação: ${contratoData?.situacao || '-'}
-          </div>
-        </div>
-      `;
-    });
+  const contratosRCC = Array.isArray(responseData?.contratosRCC)
+    ? responseData.contratosRCC
+    : (Array.isArray(dados?.contratosRCC) ? dados.contratosRCC : []);
 
-    // Monta o HTML dos contratos RMC.
-    contratosRMC.forEach((contratoData) => {
-      contratosHtml += `
-        <div class="acme-field acme-inss-contrato">
-          <div class="acme-label">${contratoData?.tipoEmprestimo || 'RMC'}</div>
-          <div class="acme-value">${contratoData?.contrato || '-'}</div>
-          <div class="acme-muted">
-            Banco: ${contratoData?.banco?.descricao || '-'}<br>
-            Limite: ${contratoData?.valorLimiteCartao ?? '-'}<br>
-            Reservado: ${contratoData?.valorReservado ?? '-'}<br>
-            Situação: ${contratoData?.situacao || '-'}
-          </div>
-        </div>
-      `;
-    });
-
-    // Monta o HTML dos contratos RCC.
-    contratosRCC.forEach((contratoData) => {
-      contratosHtml += `
-        <div class="acme-field acme-inss-contrato">
-          <div class="acme-label">${contratoData?.tipoEmprestimo || 'RCC'}</div>
-          <div class="acme-value">${contratoData?.contrato || '-'}</div>
-          <div class="acme-muted">
-            Banco: ${contratoData?.banco?.descricao || '-'}<br>
-            Limite: ${contratoData?.valorLimiteCartao ?? '-'}<br>
-            Reservado: ${contratoData?.valorReservado ?? '-'}<br>
-            Situação: ${contratoData?.situacao || '-'}
-          </div>
-        </div>
-      `;
-    });
-
-    // Renderiza o card completo com os dados da consulta.
-    result.innerHTML = `
-      <div class="acme-card">
-        <div class="acme-card-h">
-          <div class="acme-title">Resultado da Consulta INSS</div>
-          <div class="acme-actions">
-            <span class="acme-badge ${situacao === 'ATIVO' ? 'acme-badge-ok' : 'acme-badge-bad'}">
-              ${situacao || '-'}
-            </span>
-            <span class="acme-badge ${elegivel === 'Sim' ? 'acme-badge-ok' : 'acme-badge-bad'}">
-              Elegível: ${elegivel}
-            </span>
-          </div>
-        </div>
-
-        <div class="acme-card-b">
-          <div class="acme-grid">
-            <div class="acme-field">
-              <div class="acme-label">Nome</div>
-              <div class="acme-value">${nome}</div>
-            </div>
-
-            <div class="acme-field">
-              <div class="acme-label">Benefício</div>
-              <div class="acme-value">${beneficio}</div>
-            </div>
-
-            <div class="acme-field">
-              <div class="acme-label">Espécie</div>
-              <div class="acme-value">${especie}</div>
-            </div>
-
-            <div class="acme-field">
-              <div class="acme-label">Bloqueio</div>
-              <div class="acme-value">${bloqueio}</div>
-            </div>
-
-            <div class="acme-field">
-              <div class="acme-label">Banco</div>
-              <div class="acme-value">${banco}</div>
-            </div>
-
-            <div class="acme-field">
-              <div class="acme-label">Agência / Conta</div>
-              <div class="acme-value">${agencia} / ${conta}</div>
-            </div>
-
-            <div class="acme-field">
-              <div class="acme-label">Valor Base</div>
-              <div class="acme-value">${valorBase}</div>
-            </div>
-
-            <div class="acme-field">
-              <div class="acme-label">Margem</div>
-              <div class="acme-value">${margem}</div>
-            </div>
-
-          <div class="acme-inss-contracts">
-            <div class="acme-title" style="margin-top:14px;">Contratos</div>
-            ${contratosHtml || '<div class="acme-msg">Nenhum contrato encontrado.</div>'}
-          </div>
+  // Monta o HTML dos contratos de empréstimo consignado.
+  contratosEmprestimo.forEach((contratoData) => {
+    contratosHtml += `
+      <div class="acme-field acme-inss-contrato">
+        <div class="acme-label">${contratoData?.tipoEmprestimo || 'Empréstimo consignado'}</div>
+        <div class="acme-value">${contratoData?.contrato || '-'}</div>
+        <div class="acme-muted">
+          Banco: ${contratoData?.banco?.descricao || '-'}<br>
+          Parcelas: ${contratoData?.quantidadeParcelas ?? '-'}<br>
+          Parcela: ${contratoData?.valorParcela ?? '-'}<br>
+          Situação: ${contratoData?.situacao || '-'}
         </div>
       </div>
     `;
-  }
+  });
+
+  // Monta o HTML dos contratos RMC.
+  contratosRMC.forEach((contratoData) => {
+    contratosHtml += `
+      <div class="acme-field acme-inss-contrato">
+        <div class="acme-label">${contratoData?.tipoEmprestimo || 'RMC'}</div>
+        <div class="acme-value">${contratoData?.contrato || '-'}</div>
+        <div class="acme-muted">
+          Banco: ${contratoData?.banco?.descricao || '-'}<br>
+          Limite: ${contratoData?.valorLimiteCartao ?? '-'}<br>
+          Reservado: ${contratoData?.valorReservado ?? '-'}<br>
+          Situação: ${contratoData?.situacao || '-'}
+        </div>
+      </div>
+    `;
+  });
+
+  // Monta o HTML dos contratos RCC.
+  contratosRCC.forEach((contratoData) => {
+    contratosHtml += `
+      <div class="acme-field acme-inss-contrato">
+        <div class="acme-label">${contratoData?.tipoEmprestimo || 'RCC'}</div>
+        <div class="acme-value">${contratoData?.contrato || '-'}</div>
+        <div class="acme-muted">
+          Banco: ${contratoData?.banco?.descricao || '-'}<br>
+          Limite: ${contratoData?.valorLimiteCartao ?? '-'}<br>
+          Reservado: ${contratoData?.valorReservado ?? '-'}<br>
+          Situação: ${contratoData?.situacao || '-'}
+        </div>
+      </div>
+    `;
+  });
+
+  // Renderiza o card completo com os dados da consulta.
+  result.innerHTML = `
+    <div class="acme-card">
+      <div class="acme-card-h">
+        <div class="acme-title">Resultado da Consulta INSS</div>
+        <div class="acme-actions">
+          <span class="acme-badge ${situacao === 'ATIVO' ? 'acme-badge-ok' : 'acme-badge-bad'}">
+            ${situacao || '-'}
+          </span>
+          <span class="acme-badge ${elegivel === 'Sim' ? 'acme-badge-ok' : 'acme-badge-bad'}">
+            Elegível: ${elegivel}
+          </span>
+          ${pdfButtonHtml}
+        </div>
+      </div>
+
+      <div class="acme-card-b">
+        <div class="acme-grid">
+          <div class="acme-field">
+            <div class="acme-label">Nome</div>
+            <div class="acme-value">${nome}</div>
+          </div>
+
+          <div class="acme-field">
+            <div class="acme-label">Benefício</div>
+            <div class="acme-value">${beneficio}</div>
+          </div>
+
+          <div class="acme-field">
+            <div class="acme-label">Espécie</div>
+            <div class="acme-value">${especie}</div>
+          </div>
+
+          <div class="acme-field">
+            <div class="acme-label">Bloqueio</div>
+            <div class="acme-value">${bloqueio}</div>
+          </div>
+
+          <div class="acme-field">
+            <div class="acme-label">Banco</div>
+            <div class="acme-value">${banco}</div>
+          </div>
+
+          <div class="acme-field">
+            <div class="acme-label">Agência / Conta</div>
+            <div class="acme-value">${agencia} / ${conta}</div>
+          </div>
+
+          <div class="acme-field">
+            <div class="acme-label">Valor Base</div>
+            <div class="acme-value">${valorBase}</div>
+          </div>
+
+          <div class="acme-field">
+            <div class="acme-label">Margem</div>
+            <div class="acme-value">${margem}</div>
+          </div>
+        </div>
+
+        <div class="acme-inss-contracts">
+          <div class="acme-title" style="margin-top:14px;">Contratos</div>
+          ${contratosHtml || '<div class="acme-msg">Nenhum contrato encontrado.</div>'}
+        </div>
+      </div>
+    </div>
+  `;
+}
 
   // Dispara a consulta inicial para o endpoint REST de "start".
   async function startConsulta(beneficio) {
