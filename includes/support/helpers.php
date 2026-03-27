@@ -939,17 +939,6 @@ add_action('wp_ajax_acme_inss_pdf_request', function () {
     wp_die('response_json inválido.');
   }
 
-  /*$dados = [];
-  if (isset($payload['dados']) && is_array($payload['dados'])) {
-    $dados = $payload['dados'];
-  }
-
-  if (empty($dados)) {
-    wp_die('Dados da consulta INSS não encontrados.');
-  }
-
-  $html = acme_inss_build_pdf_html($row, $dados);
-  */
   $dados = [];
   if (isset($payload['dados']) && is_array($payload['dados'])) {
     $dados = $payload;
@@ -959,9 +948,20 @@ add_action('wp_ajax_acme_inss_pdf_request', function () {
     wp_die('Dados da consulta INSS não encontrados.');
   }
 
-  $html = acme_inss_build_pdf_html($row, $dados);
+  /*$html = acme_inss_build_pdf_html($row, $dados);
+  acme_pdf_stream_html($html, 'consulta-inss-' . $requestId . '.pdf');*/
 
-  acme_pdf_stream_html($html, 'consulta-inss-' . $requestId . '.pdf');
+  try {
+    require_once ACME_PLUGIN_DIR . 'includes/services/InssTcpdfService.php';
+
+    $pdfService = new InssTcpdfService();
+    $pdfService->outputPdf($row, $dados, 'consulta-inss-' . $requestId . '.pdf');
+  } catch (\Throwable $e) {
+    error_log('[ACME][INSS][PDF][TCPDF] ' . $e->getMessage());
+
+    $html = acme_inss_build_pdf_html($row, $dados);
+    acme_pdf_stream_html($html, 'consulta-inss-' . $requestId . '.pdf');
+  }
 });
 
 /* ============================================================
@@ -1709,40 +1709,63 @@ if (!function_exists('acme_get_credit_table_service_totals')) {
 /**
  * Novo serviço INSS
  */
+
+
+//Gerar o PDF báásico
 if (!function_exists('acme_inss_build_pdf_html')) {
   function acme_inss_build_pdf_html(array $row, array $dados): string
   {
-    $fmtDateTime = function ($value): string {
-      if (empty($value)) {
+    $esc = static function ($value): string {
+      if (is_array($value) || is_object($value)) {
         return '—';
       }
 
-      $timestamp = strtotime((string) $value);
-      if (!$timestamp) {
-        return '—';
+      $value = trim((string) $value);
+      return esc_html($value !== '' ? $value : '—');
+    };
+
+    $onlyDigits = static function ($value): string {
+      return preg_replace('/\D+/', '', (string) $value);
+    };
+
+    $formatCpf = static function ($value) use ($onlyDigits): string {
+      $digits = $onlyDigits($value);
+      if (strlen($digits) !== 11) {
+        return trim((string) $value) !== '' ? esc_html((string) $value) : '—';
       }
 
-      return date_i18n('d/m/Y H:i:s', $timestamp);
+      return substr($digits, 0, 3) . '.' . substr($digits, 3, 3) . '.' . substr($digits, 6, 3) . '-' . substr($digits, 9, 2);
     };
 
-    $esc = function ($value): string {
-      $stringValue = is_scalar($value) ? (string) $value : '—';
-      return esc_html($stringValue !== '' ? $stringValue : '—');
+    $formatBenefit = static function ($value) use ($onlyDigits): string {
+      $digits = $onlyDigits($value);
+      if (strlen($digits) !== 10) {
+        return trim((string) $value) !== '' ? esc_html((string) $value) : '—';
+      }
+
+      return substr($digits, 0, 3) . '.' . substr($digits, 3, 3) . '.' . substr($digits, 6, 3) . '-' . substr($digits, 9, 1);
     };
 
-    $formatMoney = function ($value): string {
+    $formatMoney = static function ($value): string {
       if ($value === null || $value === '') {
-        return '—';
+        return 'R$0,00';
+      }
+
+      if (is_string($value)) {
+        $normalized = str_replace(['R$', '.', ','], ['', '', '.'], trim($value));
+        if (is_numeric($normalized)) {
+          $value = (float) $normalized;
+        }
       }
 
       if (is_numeric($value)) {
-        return 'R$ ' . number_format((float) $value, 2, ',', '.');
+        return 'R$' . number_format((float) $value, 2, ',', '.');
       }
 
       return esc_html((string) $value);
     };
 
-    $formatDate = function ($value): string {
+    $formatDate = static function ($value): string {
       if (empty($value)) {
         return '—';
       }
@@ -1755,521 +1778,784 @@ if (!function_exists('acme_inss_build_pdf_html')) {
       return date_i18n('d/m/Y', $timestamp);
     };
 
-    $boolLabel = function ($value): string {
+    $formatMonthYear = static function ($value): string {
+      if (empty($value)) {
+        return '—';
+      }
+
+      $timestamp = strtotime((string) $value);
+      if ($timestamp) {
+        return date_i18n('m/Y', $timestamp);
+      }
+
+      if (preg_match('/^\d{2}\/\d{4}$/', (string) $value)) {
+        return esc_html((string) $value);
+      }
+
+      return esc_html((string) $value);
+    };
+
+    $formatDateTime = static function ($value): string {
+      if (empty($value)) {
+        return date_i18n('d/m/Y H:i:s');
+      }
+
+      $timestamp = strtotime((string) $value);
+      if (!$timestamp) {
+        return date_i18n('d/m/Y H:i:s');
+      }
+
+      return date_i18n('d/m/Y H:i:s', $timestamp);
+    };
+
+    $boolText = static function ($value, string $yes = 'Possui', string $no = 'Não possui'): string {
       if ($value === true || $value === 1 || $value === '1') {
-        return 'Sim';
+        return $yes;
       }
 
       if ($value === false || $value === 0 || $value === '0') {
-        return 'Não';
+        return $no;
       }
 
-      return '—';
+      return $no;
     };
 
-    $dadosBase = isset($dados['dados']) && is_array($dados['dados'])
-      ? $dados['dados']
-      : $dados;
+    $bankDescription = static function ($bankValue): string {
+      if (is_array($bankValue)) {
+        $description = trim((string) ($bankValue['descricao'] ?? ''));
+        $code = trim((string) ($bankValue['codigo'] ?? ''));
+        if ($description !== '') {
+          return $description;
+        }
+        if ($code !== '') {
+          return $code;
+        }
+        return '—';
+      }
 
-    $beneficio = (string) (
-      $row['numeroDocumento']
-      ?? $dadosBase['beneficio']
-      ?? $row['cpf_masked']
-      ?? '—'
-    );
+      $bankValue = trim((string) $bankValue);
+      return $bankValue !== '' ? $bankValue : '—';
+    };
 
-    $nome = (string) ($dadosBase['nome'] ?? '—');
+    $get = static function (array $source, array $keys, $default = '—') {
+      foreach ($keys as $key) {
+        if (array_key_exists($key, $source) && $source[$key] !== null && $source[$key] !== '') {
+          return $source[$key];
+        }
+      }
+      return $default;
+    };
 
-    $situacao = (string) ($dadosBase['situacao'] ?? '—');
+    $sumByStatus = static function (array $items, string $targetStatus): int {
+      $count = 0;
+      foreach ($items as $item) {
+        if (!is_array($item)) {
+          continue;
+        }
+        $status = strtolower(trim((string) ($item['situacao'] ?? '')));
+        if ($status === strtolower($targetStatus)) {
+          $count++;
+        }
+      }
+      return $count;
+    };
 
-    $especie = (string) (
-      $dadosBase['especie']['descricao']
-      ?? $dadosBase['especie']
-      ?? '—'
-    );
+    $qrImagePath = plugin_dir_path(dirname(__FILE__, 2)) . 'assets/img/inss-qr-fixo.png';
+    $qrImageSrc = '';
+    if (file_exists($qrImagePath) && is_readable($qrImagePath)) {
+      $qrMime = function_exists('mime_content_type') ? mime_content_type($qrImagePath) : 'image/png';
+      $qrImageSrc = 'data:' . $qrMime . ';base64,' . base64_encode((string) file_get_contents($qrImagePath));
+    }
 
-    $bloqueio = $boolLabel(
-      $dadosBase['bloqueioEmprestimo']
-        ?? $dadosBase['bloqueioEmprestismo']
-        ?? null
-    );
+    $authText = defined('ACME_INSS_AUTH_TEXT')
+      ? (string) ACME_INSS_AUTH_TEXT
+      : 'Consulte a autenticidade com o código informado no QR Code.';
 
-    $motivoBloqueio = (string) (
-      $dadosBase['motivoBloqueio']
-      ?? $dadosBase['motivo']
-      ?? '—'
-    );
+    $generatedAt = $formatDateTime($row['completed_at'] ?? $row['updated_at'] ?? $row['created_at'] ?? current_time('mysql'));
 
-    $orgaoPagador = (string) (
-      $dadosBase['banco']['descricao']
-      ?? $dadosBase['orgaoPagador']
-      ?? '—'
-    );
+    $beneficioNumero = $get($dados, ['beneficio', 'numeroBeneficio', 'nb'], $row['cpf_masked'] ?? '');
+    $beneficioFormatado = $formatBenefit($beneficioNumero);
 
-    $codigoAgencia = (string) (
-      $dadosBase['agencia']
-      ?? $dadosBase['codigoAgencia']
-      ?? '—'
-    );
+    $nome = $esc($get($dados, ['nome', 'nomeBeneficiario'], '—'));
+    $especieDescricao = $esc((string) ($dados['especie']['descricao'] ?? $dados['beneficioDescricao'] ?? '—'));
+    $situacao = $esc($get($dados, ['situacao'], 'ATIVO'));
 
+    $bancoPagamento = $esc($bankDescription($dados['banco'] ?? $dados['bancoPagamento'] ?? '—'));
+    $meioPagamento = $esc($get($dados, ['meioPagamento', 'formaPagamento'], '—'));
+    $agencia = $esc($get($dados, ['agencia', 'codigoAgencia'], '—'));
+    $conta = $esc($get($dados, ['conta', 'contaCorrente'], '—'));
 
-    /*
- * Margens reais do provider atual
- */
-    $margemBase = $dadosBase['valorBase'] ?? '—';
-    $margemDisponivel = $dadosBase['margemDisponivelEmprestimo'] ?? '—';
-    $margemRmc = $dadosBase['margemReservadaRMC'] ?? '—';
-    $margemRcc = $dadosBase['margemReservadaRCC'] ?? '—';
+    $possuiProcurador = $esc($boolText($get($dados, ['possuiProcurador'], false), 'Possui procurador', 'Não possui procurador'));
+    $possuiRepresentante = $esc($boolText($get($dados, ['possuiRepresentante', 'possuiRepresentanteLegal'], false), 'Possui representante legal', 'Não possui representante legal'));
+    $pensaoAlimenticia = $esc($boolText($get($dados, ['pensaoAlimenticia'], false), 'Com pensão alimentícia', 'Pensão alimentícia'));
+    $elegivelEmprestimoBool = $get($dados, ['elegivelEmprestimo'], true);
+    $elegivelEmprestimo = $esc(($elegivelEmprestimoBool === true || $elegivelEmprestimoBool === 1 || $elegivelEmprestimoBool === '1') ? 'Elegível para empréstimos' : 'Não elegível para empréstimos');
 
-    $contratosEmprestimo = isset($dados['contratosEmprestimo']) && is_array($dados['contratosEmprestimo'])
-      ? $dados['contratosEmprestimo']
-      : [];
+    $contratosEmprestimo = is_array($dados['contratosEmprestimo'] ?? null) ? $dados['contratosEmprestimo'] : [];
+    $contratosRmc = is_array($dados['contratosRMC'] ?? null) ? $dados['contratosRMC'] : [];
+    $contratosRcc = is_array($dados['contratosRCC'] ?? null) ? $dados['contratosRCC'] : [];
 
-    $contratosRmc = isset($dados['contratosRMC']) && is_array($dados['contratosRMC'])
-      ? $dados['contratosRMC']
-      : [];
+    $ativosEmprestimo = $sumByStatus($contratosEmprestimo, 'ativo');
+    $suspensosEmprestimo = $sumByStatus($contratosEmprestimo, 'suspenso');
 
-    $contratosRcc = isset($dados['contratosRCC']) && is_array($dados['contratosRCC'])
-      ? $dados['contratosRCC']
-      : [];
+    $ativosCartao = $sumByStatus($contratosRmc, 'ativo') + $sumByStatus($contratosRcc, 'ativo');
+    $suspensosCartao = $sumByStatus($contratosRmc, 'suspenso') + $sumByStatus($contratosRcc, 'suspenso');
 
-    $renderRows = function (array $items, array $columns) use ($esc, $formatDate, $formatMoney): string {
-      $rowsHtml = '';
+    $ativosTotal = $ativosEmprestimo + $ativosCartao;
+    $suspensosTotal = $suspensosEmprestimo + $suspensosCartao;
+
+    $baseCalculo = $get($dados, ['valorBase', 'margemBase', 'baseCalculo'], 0);
+    $margemConsignavel = $get($dados, ['margemConsignavel'], 0);
+    $margemUtilizadaEmprestimo = $get($dados, ['margemUtilizadaEmprestimo'], 0);
+    $margemDisponivelEmprestimo = $get($dados, ['margemDisponivelEmprestimo'], 0);
+    $margemRmc = $get($dados, ['margemRmc', 'margemUtilizadaRmc'], 0);
+    $margemRcc = $get($dados, ['margemRcc', 'margemUtilizadaRcc'], 0);
+
+    $maxComprometimento = is_numeric($baseCalculo) ? ((float) $baseCalculo * 0.45) : 0;
+    $totalComprometido = (float) (is_numeric($margemUtilizadaEmprestimo) ? $margemUtilizadaEmprestimo : 0)
+      + (float) (is_numeric($margemRmc) ? $margemRmc : 0)
+      + (float) (is_numeric($margemRcc) ? $margemRcc : 0);
+
+    $margemDisponivelEmprestimoValor = is_numeric($margemDisponivelEmprestimo)
+      ? (float) $margemDisponivelEmprestimo
+      : 0;
+
+    $margemDisponivelRmc = is_numeric($margemRmc) ? max((((float) $baseCalculo) * 0.05) - (float) $margemRmc, 0) : 0;
+    $margemDisponivelRcc = is_numeric($margemRcc) ? max((((float) $baseCalculo) * 0.05) - (float) $margemRcc, 0) : 0;
+
+    $renderContractRows = static function (array $items) use ($esc, $formatDate, $formatMonthYear, $formatMoney, $bankDescription): string {
+      $html = '';
 
       foreach ($items as $item) {
         if (!is_array($item)) {
           continue;
         }
 
-        $rowsHtml .= '<tr>';
+        $numeroContrato = $esc($item['contrato'] ?? $item['numeroContrato'] ?? '—');
+        $banco = $esc($bankDescription($item['banco'] ?? '—'));
+        $situacao = $esc($item['situacao'] ?? '—');
+        $origem = $esc($item['origemAverbacao'] ?? '');
+        $dataInclusao = $formatDate($item['dataInclusao'] ?? $item['dataInicio'] ?? '');
+        $competenciaInicio = $formatMonthYear($item['competenciaInicio'] ?? $item['dataInicio'] ?? '');
+        $competenciaFim = $formatMonthYear($item['competenciaFim'] ?? $item['dataFim'] ?? '');
+        $qtdParcelas = $esc($item['quantidadeParcelas'] ?? '—');
+        $parcela = $formatMoney($item['valorParcela'] ?? 0);
+        $valorEmprestado = $formatMoney($item['valorEmprestado'] ?? 0);
+        $valorLiberado = $formatMoney($item['valorLiberado'] ?? 0);
+        $iof = $formatMoney($item['iof'] ?? 0);
+        $cetMensal = $esc($item['cetMensal'] ?? '');
+        $cetAnual = $esc($item['cetAnual'] ?? '');
+        $taxaMensal = $esc($item['taxaMensal'] ?? '');
+        $taxaAnual = $esc($item['taxaAnual'] ?? '');
 
-        foreach ($columns as $columnKey) {
-          $columnValue = $item[$columnKey] ?? '—';
-
-          if ($columnKey === 'banco') {
-            $columnValue = is_array($item['banco'] ?? null)
-              ? ($item['banco']['descricao'] ?? '—')
-              : ($item['banco'] ?? '—');
-          }
-
-          if ($columnKey === 'numeroContrato' && $columnValue === '—') {
-            $columnValue = $item['contrato'] ?? '—';
-          }
-
-          if ($columnKey === 'dataInicio' && $columnValue === '—') {
-            $columnValue = $item['dataInclusao'] ?? '—';
-          }
-
-          if ($columnKey === 'limite' && $columnValue === '—') {
-            $columnValue = $item['valorLimiteCartao'] ?? '—';
-          }
-
-          if ($columnKey === 'saldoDevedor' && $columnValue === '—') {
-            $columnValue = $item['valorEmprestado'] ?? '—';
-          }
-
-          if (in_array($columnKey, ['dataInicio', 'dataFim'], true)) {
-            $columnValue = $formatDate($columnValue);
-          } elseif (in_array($columnKey, ['valorParcela', 'saldoDevedor', 'limite', 'valorReservado'], true)) {
-            $columnValue = $formatMoney($columnValue);
-          } else {
-            $columnValue = $esc($columnValue);
-          }
-
-          $rowsHtml .= '<td>' . $columnValue . '</td>';
-        }
-
-        $rowsHtml .= '</tr>';
+        $html .= '
+          <tr>
+            <td>' . $numeroContrato . '</td>
+            <td>' . $banco . '</td>
+            <td>' . $situacao . '</td>
+            <td>' . $origem . '</td>
+            <td>' . $dataInclusao . '</td>
+            <td>' . $competenciaInicio . '</td>
+            <td>' . $competenciaFim . '</td>
+            <td>' . $qtdParcelas . '</td>
+            <td>' . $parcela . '</td>
+            <td>' . $valorEmprestado . '</td>
+            <td>' . $valorLiberado . '</td>
+            <td>' . $iof . '</td>
+            <td>' . $cetMensal . '</td>
+            <td>' . $cetAnual . '</td>
+            <td>' . $taxaMensal . '</td>
+            <td>' . $taxaAnual . '</td>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td></td>
+          </tr>';
       }
 
-      if ($rowsHtml === '') {
-        $rowsHtml = '<tr><td colspan="' . count($columns) . '">Nenhum contrato encontrado.</td></tr>';
+      if ($html === '') {
+        $html = '
+          <tr>
+            <td colspan="20" style="text-align:center;">Nenhum contrato encontrado.</td>
+          </tr>';
       }
 
-      return $rowsHtml;
+      return $html;
     };
 
-    $emprestimoRows = $renderRows($contratosEmprestimo, [
-      'banco',
-      'numeroContrato',
-      'dataInicio',
-      'dataFim',
-      'valorParcela',
-      'saldoDevedor',
-      'situacao',
-    ]);
+    $renderCardRows = static function (array $items) use ($esc, $formatDate, $formatMoney, $bankDescription): string {
+      $html = '';
 
-    $rmcRows = $renderRows($contratosRmc, [
-      'banco',
-      'numeroContrato',
-      'limite',
-      'valorReservado',
-      'situacao',
-    ]);
+      foreach ($items as $item) {
+        if (!is_array($item)) {
+          continue;
+        }
 
-    $rccRows = $renderRows($contratosRcc, [
-      'banco',
-      'numeroContrato',
-      'limite',
-      'valorReservado',
-      'situacao',
-    ]);
+        $numeroContrato = $esc($item['contrato'] ?? $item['numeroContrato'] ?? '—');
+        $banco = $esc($bankDescription($item['banco'] ?? '—'));
+        $situacao = $esc($item['situacao'] ?? '—');
+        $origem = $esc($item['origemAverbacao'] ?? '');
+        $dataInclusao = $formatDate($item['dataInclusao'] ?? '');
+        $limite = $formatMoney($item['limite'] ?? $item['limiteCartao'] ?? 0);
+        $reservado = $formatMoney($item['valorReservado'] ?? $item['reservado'] ?? 0);
 
-    $generatedAt = $fmtDateTime($row['created_at'] ?? current_time('mysql'));
+        $html .= '
+          <tr>
+            <td>' . $numeroContrato . '</td>
+            <td>' . $banco . '</td>
+            <td>' . $situacao . '</td>
+            <td>' . $origem . '</td>
+            <td>' . $dataInclusao . '</td>
+            <td>' . $limite . '</td>
+            <td>' . $reservado . '</td>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td></td>
+          </tr>';
+      }
 
-    return '
-<!doctype html>
+      if ($html === '') {
+        $html = '
+          <tr>
+            <td colspan="11" style="text-align:center;">Nenhum contrato encontrado.</td>
+          </tr>';
+      }
+
+      return $html;
+    };
+
+    $emprestimoRowsHtml = $renderContractRows($contratosEmprestimo);
+    $rmcRowsHtml = $renderCardRows($contratosRmc);
+    $rccRowsHtml = $renderCardRows($contratosRcc);
+
+    $page1QrBlock = $qrImageSrc !== ''
+      ? '<div class="qr-box"><img src="' . esc_attr($qrImageSrc) . '" alt="QR Code"></div>'
+      : '<div class="qr-box qr-placeholder">QR</div>';
+
+    return '<!doctype html>
 <html lang="pt-BR">
 <head>
-<meta charset="utf-8">
-<title>Consulta INSS</title>
-<style>
-  body{
-    font-family: DejaVu Sans, Arial, sans-serif;
-    font-size:12px;
-    color:#111;
-    margin:16px;
-  }
+  <meta charset="utf-8">
+  <title>Histórico de Empréstimo Consignado</title>
+  <style>
+    @page {
+      margin: 14mm 10mm 14mm 10mm;
+    }
 
-  .topbar{
-    background:#0b4ea2;
-    height:34px;
-    margin:-16px -16px 14px -16px;
-  }
+    body {
+      font-family: DejaVu Sans, sans-serif;
+      color: #222;
+      font-size: 10px;
+      margin: 0;
+      padding: 0;
+    }
 
-  .title{
-    text-align:center;
-    font-size:22px;
-    font-weight:700;
-    letter-spacing:0.5px;
-    margin:10px 0 6px;
-    color:#111;
-  }
+    .page {
+      position: relative;
+      min-height: 267mm;
+      page-break-after: always;
+    }
 
-  .subtitle{
-    text-align:center;
-    font-size:13px;
-    margin:0 0 12px;
-    color:#333;
-  }
+    .page.last {
+      page-break-after: auto;
+    }
 
-  .card{
-    border:1px solid #d6d6d6;
-    border-radius:8px;
-    margin:12px 0;
-    overflow:hidden;
-  }
+    .top-band {
+      width: 100%;
+      height: 16px;
+      background: #3b3b3b;
+      position: relative;
+      margin-bottom: 12px;
+    }
 
-  .card-h{
-    background:#e9ecef;
-    padding:10px 12px;
-    font-weight:700;
-    color:#111;
-  }
+    .top-band .blue {
+      width: 38%;
+      height: 16px;
+      background: #005db8;
+      margin: 0 auto;
+      color: #fff;
+      text-align: center;
+      font-size: 8px;
+      line-height: 16px;
+      font-weight: bold;
+    }
 
-  .card-b{
-    padding:12px;
-  }
+    .doc-title {
+      font-size: 16px;
+      font-weight: bold;
+      margin: 0 0 8px 0;
+    }
 
-  .grid{
-    width:100%;
-    border-collapse:collapse;
-  }
+    .subtitle {
+      font-size: 11px;
+      font-weight: bold;
+      margin: 0 0 8px 0;
+    }
 
-  .grid td{
-    vertical-align:top;
-    padding:4px 6px;
-  }
+    .muted {
+      color: #666;
+    }
 
-  .label{
-    color:#333;
-    font-weight:700;
-  }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
 
-  .badge{
-    display:inline-block;
-    padding:4px 10px;
-    border-radius:12px;
-    font-weight:700;
-    line-height:1.2;
-    vertical-align:middle;
-    position:relative;
-    top:1px;
-  }
+    .bordered td,
+    .bordered th {
+      border: 1px solid #444;
+      padding: 4px 5px;
+      vertical-align: middle;
+    }
 
-  .badge-ok{
-    background:#e8fff0;
-    color:#0a7a2f;
-  }
+    .bordered th {
+      background: #e9ecef;
+      font-weight: bold;
+      text-align: center;
+    }
 
-  .badge-no{
-    background:#fff0f0;
-    color:#b00020;
-  }
+    .header-table td {
+      border: none;
+      padding: 1px 0;
+      vertical-align: top;
+    }
 
-  table.tbl{
-    width:100%;
-    border-collapse:collapse;
-    table-layout:fixed;
-    font-size:9.5px;
-  }
+    .header-table .left-col {
+      width: 58%;
+      padding-right: 8px;
+    }
 
-  .tbl th,
-  .tbl td{
-    border:1px solid #222;
-    padding:6px;
-    vertical-align:top;
-    white-space:normal;
-    word-break:break-word;
-    overflow-wrap:anywhere;
-  }
+    .header-table .right-col {
+      width: 42%;
+      padding-left: 8px;
+    }
 
-  .tbl th{
-    background:#e9ecef;
-    font-weight:700;
-    color:#111;
-  }
+    .field-label {
+      font-weight: bold;
+    }
 
-  .footer{
-    position:fixed;
-    bottom:10px;
-    left:0;
-    right:0;
-    font-size:10px;
-    color:#333;
-  }
+    .gray-strip {
+      background: #e9ecef;
+      border: 1px solid #777;
+      padding: 8px 10px;
+      font-size: 13px;
+      font-weight: bold;
+      margin-top: 6px;
+      margin-bottom: 8px;
+    }
 
-  .footer .r{
-    float:right;
-  }
-</style>
+    .section-title {
+      font-size: 12px;
+      font-weight: bold;
+      margin: 0 0 8px 0;
+    }
+
+    .small {
+      font-size: 9px;
+    }
+
+    .tiny {
+      font-size: 8px;
+    }
+
+    .summary-table td,
+    .summary-table th {
+      border: 1px solid #444;
+      padding: 4px 5px;
+    }
+
+    .summary-table th {
+      background: #fff;
+      text-align: center;
+      font-weight: bold;
+    }
+
+    .right {
+      text-align: right;
+    }
+
+    .center {
+      text-align: center;
+    }
+
+    .contracts th,
+    .contracts td {
+      border: 1px solid #444;
+      padding: 3px 4px;
+      font-size: 7.2px;
+      vertical-align: middle;
+    }
+
+    .contracts th {
+      background: #e9ecef;
+      text-align: center;
+      font-weight: bold;
+    }
+
+    .cards th,
+    .cards td {
+      border: 1px solid #444;
+      padding: 3px 4px;
+      font-size: 8px;
+      vertical-align: middle;
+    }
+
+    .cards th {
+      background: #e9ecef;
+      text-align: center;
+      font-weight: bold;
+    }
+
+    .note {
+      font-size: 8px;
+      margin-top: 4px;
+    }
+
+    .auth-block {
+      margin-top: 14px;
+      font-size: 9px;
+    }
+
+    .qr-wrap {
+      margin-top: 8px;
+      width: 100%;
+      text-align: left;
+    }
+
+    .qr-box {
+      width: 82px;
+      height: 82px;
+      border: 1px solid #999;
+      display: inline-block;
+      text-align: center;
+      line-height: 82px;
+      font-size: 16px;
+      color: #666;
+    }
+
+    .qr-box img {
+      width: 82px;
+      height: 82px;
+      display: block;
+    }
+
+    .footer-line {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 22px;
+      border-top: 1px solid #bcbcbc;
+      height: 0;
+    }
+
+    .footer-mark {
+      position: absolute;
+      width: 120px;
+      height: 4px;
+      background: #005db8;
+      left: 50%;
+      margin-left: -60px;
+      bottom: 20px;
+    }
+
+    .footer-left {
+      position: absolute;
+      bottom: 2px;
+      left: 0;
+      font-size: 9px;
+      color: #005db8;
+      font-weight: bold;
+    }
+
+    .footer-right {
+      position: absolute;
+      bottom: 2px;
+      right: 0;
+      font-size: 9px;
+      text-align: right;
+    }
+
+    .brand-inss {
+      font-size: 18px;
+      font-weight: bold;
+      color: #0070c9;
+    }
+
+    .spacer-6 { height: 6px; }
+    .spacer-10 { height: 10px; }
+    .spacer-14 { height: 14px; }
+  </style>
 </head>
 <body>
-  <div class="topbar"></div>
 
-  <div class="title">CONSULTA INSS</div>
-  <div class="subtitle">' . $esc($nome) . ' • Benefício: ' . $esc($beneficio) . '</div>
+  <div class="page">
+    <div class="top-band"><div class="blue">Instituto Nacional do Seguro Social</div></div>
 
-  <div class="card">
-    <div class="card-h">Resumo</div>
-    <div class="card-b">
-      <table class="grid">
-        <tr>
-          <td width="60%">
-            <div><span class="label">Nome:</span> ' . $esc($nome) . '</div>
-            <div><span class="label">Benefício:</span> ' . $esc($beneficio) . '</div>
-            <div><span class="label">Espécie:</span> ' . $esc($especie) . '</div>
-            <div><span class="label">Situação:</span> ' . $esc($situacao) . '</div>
-            <div><span class="label">Bloqueio:</span>
-              <span class="badge ' . (($bloqueio === 'Sim') ? 'badge-no' : 'badge-ok') . '">' . $esc($bloqueio) . '</span>
-            </div>
-          </td>
-          <td width="40%">
-            <div><span class="label">Motivo bloqueio:</span> ' . $esc($motivoBloqueio) . '</div>
-            <div><span class="label">Órgão pagador:</span> ' . $esc($orgaoPagador) . '</div>
-            <div><span class="label">Agência:</span> ' . $esc($codigoAgencia) . '</div>
-            <div><span class="label">Margem base:</span> ' . $esc($formatMoney($margemBase)) . '</div>
-            <div><span class="label">Margem disponível:</span> ' . $esc($formatMoney($margemDisponivel)) . '</div>
-          </td>
-        </tr>
-      </table>
+    <div class="doc-title">Instituto Nacional do Seguro Social</div>
+    <div class="doc-title">HISTÓRICO DE<br>EMPRÉSTIMO CONSIGNADO</div>
+
+    <div style="font-size:14px; font-weight:bold; margin-bottom:10px;">' . $nome . '</div>
+
+    <table class="header-table">
+      <tr>
+        <td class="left-col">
+          <div><span class="field-label">Benefício</span></div>
+          <div>' . $especieDescricao . '</div>
+
+          <div class="spacer-6"></div>
+          <div><span class="field-label">Nº Benefício:</span> ' . $esc($beneficioFormatado) . '</div>
+          <div><span class="field-label">Situação:</span> ' . $situacao . '</div>
+          <div><span class="field-label">Pago em:</span> ' . $bancoPagamento . '</div>
+          <div><span class="field-label">Meio:</span> ' . $meioPagamento . '</div>
+          <div><span class="field-label">Agência:</span> ' . $agencia . '</div>
+          <div><span class="field-label">Conta Corrente:</span> ' . $conta . '</div>
+        </td>
+        <td class="right-col">
+          <div>' . $possuiProcurador . '</div>
+          <div>' . $possuiRepresentante . '</div>
+          <div>' . $pensaoAlimenticia . '</div>
+          <div>' . $elegivelEmprestimo . '</div>
+
+          <div class="spacer-14"></div>
+
+          ' . $page1QrBlock . '
+        </td>
+      </tr>
+    </table>
+
+    <div class="spacer-10"></div>
+
+    <div class="subtitle">Quantitativo de Empréstimos por Situação</div>
+    <table class="summary-table">
+      <tr>
+        <th style="width:70%;">SITUAÇÃO</th>
+        <th style="width:30%;">QUANTIDADE</th>
+      </tr>
+      <tr>
+        <td>ATIVOS</td>
+        <td class="center">' . (int) $ativosTotal . '</td>
+      </tr>
+      <tr>
+        <td>SUSPENSOS</td>
+        <td class="center">' . (int) $suspensosTotal . '</td>
+      </tr>
+      <tr>
+        <td>RESERVADOS PORTABILIDADE</td>
+        <td class="center">0</td>
+      </tr>
+      <tr>
+        <td>RESERVADOS REFINANCIAMENTO</td>
+        <td class="center">0</td>
+      </tr>
+    </table>
+
+    <div class="auth-block">
+      <div>Você pode conferir a autenticidade do documento</div>
+      <div>' . $esc($authText) . '</div>
     </div>
+
+    <div class="footer-line"></div>
+    <div class="footer-mark"></div>
+    <div class="footer-left"><span class="brand-inss">INSS</span></div>
+    <div class="footer-right">' . $esc($generatedAt) . '<br>1 / 3</div>
   </div>
 
-  <div class="card">
-    <div class="card-h">Margens complementares</div>
-    <div class="card-b">
-      <table class="grid">
-        <tr>
-          <td width="50%">
-            <div><span class="label">Margem RMC:</span> ' . $esc($formatMoney($margemRmc)) . '</div>
-          </td>
-          <td width="50%">
-            <div><span class="label">Margem RCC:</span> ' . $esc($formatMoney($margemRcc)) . '</div>
-          </td>
-        </tr>
-      </table>
+  <div class="page">
+    <div class="top-band"><div class="blue">Instituto Nacional do Seguro Social</div></div>
+
+    <div class="gray-strip">Margem para Empréstimo/Cartão e Resumo Financeiro</div>
+
+    <table class="summary-table">
+      <tr>
+        <th colspan="2">VALORES DO BENEFÍCIO</th>
+      </tr>
+      <tr>
+        <td><strong>BASE DE CÁLCULO</strong></td>
+        <td class="right">' . $formatMoney($baseCalculo) . '</td>
+      </tr>
+      <tr>
+        <td><strong>MÁXIMO DE COMPROMETIMENTO PERMITIDO</strong></td>
+        <td class="right">' . $formatMoney($maxComprometimento) . '</td>
+      </tr>
+      <tr>
+        <td><strong>TOTAL COMPROMETIDO</strong></td>
+        <td class="right">' . $formatMoney($totalComprometido) . '</td>
+      </tr>
+      <tr>
+        <td><strong>MARGEM EXTRAPOLADA***</strong></td>
+        <td class="right">R$0,00</td>
+      </tr>
+    </table>
+
+    <div class="spacer-10"></div>
+
+    <table class="summary-table">
+      <tr>
+        <th style="width:34%;"></th>
+        <th style="width:22%;">EMPRÉSTIMOS</th>
+        <th style="width:22%;">RMC</th>
+        <th style="width:22%;">RCC</th>
+      </tr>
+      <tr>
+        <td><strong>BASE DE CÁLCULO</strong></td>
+        <td class="right">' . $formatMoney($baseCalculo) . '</td>
+        <td class="right">' . $formatMoney($baseCalculo) . '</td>
+        <td class="right">' . $formatMoney($baseCalculo) . '</td>
+      </tr>
+      <tr>
+        <td><strong>MARGEM CONSIGNÁVEL*</strong></td>
+        <td class="right">' . $formatMoney($margemConsignavel) . '</td>
+        <td class="right">' . $formatMoney(((float) $baseCalculo) * 0.05) . '</td>
+        <td class="right">' . $formatMoney(((float) $baseCalculo) * 0.05) . '</td>
+      </tr>
+      <tr>
+        <td><strong>MARGEM UTILIZADA</strong></td>
+        <td class="right">' . $formatMoney($margemUtilizadaEmprestimo) . '</td>
+        <td class="right">' . $formatMoney($margemRmc) . '</td>
+        <td class="right">' . $formatMoney($margemRcc) . '</td>
+      </tr>
+      <tr>
+        <td><strong>MARGEM RESERVADA**</strong></td>
+        <td class="right">R$0,00</td>
+        <td class="center">-</td>
+        <td class="center">-</td>
+      </tr>
+      <tr>
+        <td><strong>MARGEM DISPONÍVEL</strong></td>
+        <td class="right">' . $formatMoney($margemDisponivelEmprestimoValor) . '</td>
+        <td class="right">' . $formatMoney($margemDisponivelRmc) . '</td>
+        <td class="right">' . $formatMoney($margemDisponivelRcc) . '</td>
+      </tr>
+      <tr>
+        <td><strong>MARGEM EXTRAPOLADA***</strong></td>
+        <td class="right">R$0,00</td>
+        <td class="right">R$0,00</td>
+        <td class="right">R$0,00</td>
+      </tr>
+    </table>
+
+    <div class="spacer-10"></div>
+
+    <div class="note">
+      * Para benefícios das espécies, 18, 87 e 88 a margem consignável representa 30% da base de cálculo para empréstimos e 5% para cartão, podendo optar por somente uma das modalidades RMC ou RCC. Para as demais espécies, a margem consignável atual representa 35% da base de cálculo para empréstimos, 10% para cartão, sendo 5% para RMC e 5% para RCC.
     </div>
-  </div>
-
-  <div class="card">
-    <div class="card-h">Contratos de Empréstimo (' . count((array) $contratosEmprestimo) . ')</div>
-    <div class="card-b">
-      <table class="tbl">
-        <thead>
-          <tr>
-            <th style="width:24%;">Banco</th>
-            <th style="width:18%;">Contrato</th>
-            <th style="width:14%;">Inclusão</th>
-            <th style="width:14%;">Parcela</th>
-            <th style="width:16%;">Valor</th>
-            <th style="width:14%;">Situação</th>
-          </tr>
-        </thead>
-        <tbody>' . $renderRows($contratosEmprestimo, [
-      'banco',
-      'numeroContrato',
-      'dataInicio',
-      'valorParcela',
-      'saldoDevedor',
-      'situacao',
-    ]) . '</tbody>
-      </table>
+    <div class="note">
+      ** O valor da margem reservada está incluído no valor da margem utilizada.
     </div>
-  </div>
-
-  <div class="card">
-    <div class="card-h">Contratos RMC (' . count((array) $contratosRmc) . ')</div>
-    <div class="card-b">
-      <table class="tbl">
-        <thead>
-          <tr>
-            <th style="width:34%;">Banco</th>
-            <th style="width:20%;">Contrato</th>
-            <th style="width:18%;">Limite</th>
-            <th style="width:14%;">Reservado</th>
-            <th style="width:14%;">Situação</th>
-          </tr>
-        </thead>
-        <tbody>' . $rmcRows . '</tbody>
-      </table>
+    <div class="note">
+      *** A margem extrapolada representa o valor que excedeu a margem disponível da modalidade ou o máximo de comprometimento do benefício.
     </div>
+
+    <div class="footer-line"></div>
+    <div class="footer-mark"></div>
+    <div class="footer-left"><span class="brand-inss">INSS</span></div>
+    <div class="footer-right">' . $esc($generatedAt) . '<br>2 / 3</div>
   </div>
 
-  <div class="card">
-    <div class="card-h">Contratos RCC (' . count((array) $contratosRcc) . ')</div>
-    <div class="card-b">
-      <table class="tbl">
-        <thead>
-          <tr>
-            <th style="width:34%;">Banco</th>
-            <th style="width:20%;">Contrato</th>
-            <th style="width:18%;">Limite</th>
-            <th style="width:14%;">Reservado</th>
-            <th style="width:14%;">Situação</th>
-          </tr>
-        </thead>
-        <tbody>' . $rccRows . '</tbody>
-      </table>
-    </div>
+  <div class="page">
+    <div class="top-band"><div class="blue">Instituto Nacional do Seguro Social</div></div>
+
+    <div class="doc-title" style="font-size:14px;">EMPRÉSTIMOS BANCÁRIOS</div>
+    <div class="gray-strip" style="font-size:11px;">CONTRATOS ATIVOS E SUSPENSOS*</div>
+
+    <table class="contracts">
+      <tr>
+        <th>CONTRATO</th>
+        <th>BANCO</th>
+        <th>SITUAÇÃO</th>
+        <th>ORIGEM DA AVERBAÇÃO</th>
+        <th>DATA INCLUSÃO</th>
+        <th>INÍCIO DE DESCONTO</th>
+        <th>FIM DE DESCONTO</th>
+        <th>QTDE PARCELAS</th>
+        <th>PARCELA</th>
+        <th>EMPRESTADO</th>
+        <th>LIBERADO</th>
+        <th>IOF</th>
+        <th>CET MENSAL</th>
+        <th>CET ANUAL</th>
+        <th>TAXA JUROS MENSAL</th>
+        <th>TAXA JUROS ANUAL</th>
+        <th>VALOR PAGO</th>
+        <th>PRIMEIRO DESCONTO</th>
+        <th>SUSPENS. BANCO</th>
+        <th>SUSPENS. INSS</th>
+      </tr>
+      ' . $emprestimoRowsHtml . '
+    </table>
+
+    <div class="note">*Contratos que comprometem a margem consignável.</div>
+    <div class="note">**Valor pago a título de dívida do cliente (refinanciamento e portabilidade).</div>
+
+    <div class="footer-line"></div>
+    <div class="footer-mark"></div>
+    <div class="footer-left"><span class="brand-inss">INSS</span></div>
+    <div class="footer-right">' . $esc($generatedAt) . '<br>2 / 3</div>
   </div>
 
-  <div class="footer">
-    <span>Gerado por Meu Consignado</span>
-    <span class="r">' . esc_html($generatedAt) . '</span>
+  <div class="page last">
+    <div class="top-band"><div class="blue">Instituto Nacional do Seguro Social</div></div>
+
+    <div class="doc-title" style="font-size:14px;">CARTÃO DE CRÉDITO</div>
+
+    <table class="cards" style="margin-bottom:18px;">
+      <tr>
+        <th colspan="11">CARTÃO DE CRÉDITO - RMC</th>
+      </tr>
+      <tr>
+        <th colspan="11" style="text-align:left; font-size:10px; color:#666;">CONTRATOS ATIVOS E SUSPENSOS*</th>
+      </tr>
+      <tr>
+        <th>CONTRATO</th>
+        <th>BANCO</th>
+        <th>SITUAÇÃO</th>
+        <th>ORIGEM DA AVERBAÇÃO</th>
+        <th>DATA INCLUSÃO</th>
+        <th>LIMITE DE CARTÃO</th>
+        <th>RESERVADO</th>
+        <th>SUSPENSÃO BANCO</th>
+        <th>SUSPENSÃO INSS</th>
+        <th>REATIVAÇÃO BANCO</th>
+        <th>REATIVAÇÃO INSS</th>
+      </tr>
+      ' . $rmcRowsHtml . '
+    </table>
+
+    <div class="note">* Contratos que comprometem a margem consignável</div>
+
+    <table class="cards" style="margin-top:14px;">
+      <tr>
+        <th colspan="11">CARTÃO DE CRÉDITO - RCC</th>
+      </tr>
+      <tr>
+        <th colspan="11" style="text-align:left; font-size:10px; color:#666;">CONTRATOS ATIVOS E SUSPENSOS*</th>
+      </tr>
+      <tr>
+        <th>CONTRATO</th>
+        <th>BANCO</th>
+        <th>SITUAÇÃO</th>
+        <th>ORIGEM DA AVERBAÇÃO</th>
+        <th>DATA INCLUSÃO</th>
+        <th>LIMITE DE CARTÃO</th>
+        <th>RESERVADO</th>
+        <th>SUSPENSÃO BANCO</th>
+        <th>SUSPENSÃO INSS</th>
+        <th>REATIVAÇÃO BANCO</th>
+        <th>REATIVAÇÃO INSS</th>
+      </tr>
+      ' . $rccRowsHtml . '
+    </table>
+
+    <div class="note">* Contratos que comprometem a margem consignável</div>
+
+    <div class="footer-line"></div>
+    <div class="footer-mark"></div>
+    <div class="footer-left"><span class="brand-inss">INSS</span></div>
+    <div class="footer-right">' . $esc($generatedAt) . '<br>3 / 3</div>
   </div>
+
 </body>
 </html>';
   }
 }
-
-add_action('wp_ajax_acme_inss_pdf_request', function () {
-  if (!is_user_logged_in()) {
-    wp_die('Você precisa estar logado.');
-  }
-
-  $nonce = isset($_GET['_wpnonce']) ? sanitize_text_field(wp_unslash($_GET['_wpnonce'])) : '';
-  if (!$nonce || !wp_verify_nonce($nonce, 'acme_inss_pdf_nonce')) {
-    wp_die('Token inválido.');
-  }
-
-  $requestId = isset($_GET['request_id']) ? sanitize_text_field(wp_unslash($_GET['request_id'])) : '';
-  if ($requestId === '') {
-    wp_die('request_id obrigatório.');
-  }
-
-  if (!function_exists('acme_pdf_stream_html')) {
-    wp_die('Função de PDF não disponível.');
-  }
-
-  global $wpdb;
-  $tableRequests = $wpdb->prefix . 'service_requests';
-
-  $currentUserId = get_current_user_id();
-  $currentUser = wp_get_current_user();
-
-  $isAdmin = current_user_can('manage_options');
-  $isMaster = function_exists('acme_user_has_role') && acme_user_has_role($currentUser, 'child');
-
-  if ($isAdmin) {
-    $row = $wpdb->get_row(
-      $wpdb->prepare(
-        "SELECT *
-         FROM {$tableRequests}
-         WHERE (request_id = %s OR provider_request_id = %s)
-           AND service_slug = %s
-         LIMIT 1",
-        $requestId,
-        $requestId,
-        'inss'
-      ),
-      ARRAY_A
-    );
-  } elseif ($isMaster && function_exists('acme_get_credit_table_visible_user_ids')) {
-    $visibleUserIds = acme_get_credit_table_visible_user_ids();
-    $visibleUserIds = array_values(array_unique(array_map('intval', (array) $visibleUserIds)));
-
-    if (empty($visibleUserIds)) {
-      $visibleUserIds = [$currentUserId];
-    }
-
-    $placeholders = implode(',', array_fill(0, count($visibleUserIds), '%d'));
-    $sql = "
-      SELECT *
-      FROM {$tableRequests}
-      WHERE (request_id = %s OR provider_request_id = %s)
-        AND service_slug = %s
-        AND user_id IN ({$placeholders})
-      LIMIT 1
-    ";
-
-    $params = array_merge([$requestId, $requestId, 'inss'], $visibleUserIds);
-
-    $row = $wpdb->get_row(
-      $wpdb->prepare($sql, $params),
-      ARRAY_A
-    );
-  } else {
-    $row = $wpdb->get_row(
-      $wpdb->prepare(
-        "SELECT *
-         FROM {$tableRequests}
-         WHERE (request_id = %s OR provider_request_id = %s)
-           AND service_slug = %s
-           AND user_id = %d
-         LIMIT 1",
-        $requestId,
-        $requestId,
-        'inss',
-        $currentUserId
-      ),
-      ARRAY_A
-    );
-  }
-
-
-
-  if (!$row) {
-    wp_die('Requisição INSS não encontrada.');
-  }
-
-  if (($row['status'] ?? '') !== 'completed') {
-    wp_die('Consulta ainda não foi concluída.');
-  }
-
-  $payload = json_decode($row['response_json'] ?? '{}', true);
-  if (!is_array($payload)) {
-    wp_die('response_json inválido.');
-  }
-
-  $dados = isset($payload['dados']) && is_array($payload['dados'])
-    ? $payload['dados']
-    : [];
-
-  if (empty($dados)) {
-    wp_die('Dados da consulta INSS não encontrados.');
-  }
-
-  $html = acme_inss_build_pdf_html($row, $dados);
-  acme_pdf_stream_html($html, 'consulta-inss-' . sanitize_file_name($requestId) . '.pdf');
-});

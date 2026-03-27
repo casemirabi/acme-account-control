@@ -60,6 +60,24 @@ if (!defined('ACME_INSS_BRIDGE_URL')) {
 define('ACME_INSS_BRIDGE_URL', 'https://novaeraapp.b-cdn.net/v1/consultav2/94de3edb-7082-4810-9727-4dbe243b8fff/');
 define('ACME_INSS_BRIDGE_KEY', 'dev-key');
 }
+
+if (!defined('ACME_PLUGIN_DIR')) {
+    define('ACME_PLUGIN_DIR', plugin_dir_path(__FILE__));
+}
+
+if (!defined('ACME_USE_TCPDF_INSS')) {
+    define('ACME_USE_TCPDF_INSS', true);
+}
+
+$acmeAutoload = ACME_PLUGIN_DIR . 'vendor/autoload.php';
+if (file_exists($acmeAutoload)) {
+    require_once $acmeAutoload;
+}
+
+$tcpdfMainFile = ACME_PLUGIN_DIR . 'lib/tcpdf/tcpdf.php';
+if (file_exists($tcpdfMainFile)) {
+    require_once $tcpdfMainFile;
+}
 /**
  * ============================================================
  * Helper: include seguro para evitar fatal
