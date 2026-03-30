@@ -1300,15 +1300,19 @@ if (!class_exists('InssTcpdfService')) {
                 $this->drawTopHeader($pdf);
 
                 // Título principal da página.
-                $this->writeText($pdf, 20, 52, $this->fontBold, 14, 'EMPRÉSTIMOS BANCÁRIOS');
+                // TÍTULO PRINCIPAL DA SEÇÃO
+                $pdf->SetFont($this->fontBold, '1', 14);
+                $pdf->SetTextColor(0, 0, 0);
 
+                // leve ajuste vertical para dar respiro
+                $pdf->Text(20, 58, 'EMPRÉSTIMOS BANCÁRIOS');
                 /**
                  * ========================================================
                  * BLOCO: SUBTÍTULO PADRÃO CINZA
                  * ========================================================
                  */
                 $subX = 10;
-                $subY = 76;
+                $subY = 90;
                 $subW = 818;
                 $subH = 24;
 
@@ -1397,7 +1401,7 @@ if (!class_exists('InssTcpdfService')) {
                 }
 
                 // Desenha a tabela e captura a posição final.
-                $tableEndY = $this->drawGridTable($pdf, 10, 102, $columns, $rows, 40);
+                $tableEndY = $this->drawGridTable($pdf, 10, 114, $columns, $rows, 40);
 
                 // Observações logo abaixo da tabela.
                 $notesY = $tableEndY + 10;
@@ -1450,7 +1454,9 @@ if (!class_exists('InssTcpdfService')) {
             $pdf->AddPage('L');
             $this->drawTopHeader($pdf);
 
-            $this->writeText($pdf, 20, 52, $this->fontBold, 14, 'CARTÃO DE CRÉDITO');
+            $pdf->SetFont($this->fontBold, 'B', 14);
+            $pdf->SetTextColor(0, 0, 0);
+            $pdf->Text(20, 58, 'CARTÃO DE CRÉDITO');
 
             $columns = array(
                 array('label' => "CONTRATO", 'width' => 76),
@@ -1469,43 +1475,64 @@ if (!class_exists('InssTcpdfService')) {
             // =========================
             // RMC
             // =========================
-            $this->drawSectionTitle($pdf, 10, 82, 770, 22, 'CARTÃO DE CRÉDITO - RMC');
+            $rmcTitleY = 96;
+            $rmcSubtitleY = 118;
+            $rmcTableY = 138;
 
-            // Faixa do subtítulo integrada ao bloco da tabela
+            $this->drawSectionTitle($pdf, 10, $rmcTitleY, 770, 22, 'CARTÃO DE CRÉDITO - RMC');
+
             $pdf->SetDrawColor(170, 170, 170);
             $pdf->SetFillColor(232, 236, 240);
-            $pdf->Rect(10, 104, 770, 20, 'DF');
+            $pdf->Rect(10, $rmcSubtitleY, 770, 20, 'DF');
 
             $pdf->SetTextColor(130, 130, 130);
-            $pdf->SetFont($this->fontRegular, '', 9.5);
             $pdf->SetFont($this->fontRegular, '', 12);
-            $pdf->SetXY(18, 108);
+            $pdf->SetXY(18, $rmcSubtitleY + 4);
             $pdf->Cell(740, 10, 'CONTRATOS ATIVOS E SUSPENSOS*', 0, 0, 'L');
             $pdf->SetTextColor(0, 0, 0);
 
-            $afterTableY = $this->drawGridTable($pdf, 10, 124, $columns, $this->mapCardRows($data['contratos_rmc']), 40, 6, 3);
+            $afterTableY = $this->drawGridTable(
+                $pdf,
+                10,
+                $rmcTableY,
+                $columns,
+                $this->mapCardRows($data['contratos_rmc']),
+                40,
+                6,
+                3
+            );
 
             $this->writeText($pdf, 10, $afterTableY + 6, $this->fontRegular, 8, '* Contratos que comprometem a margem consignável');
 
             // =========================
             // RCC
             // =========================
-            $this->drawSectionTitle($pdf, 10, 330, 770, 22, 'CARTÃO DE CRÉDITO - RCC');
+            $rccTitleY = 344;
+            $rccSubtitleY = 366;
+            $rccTableY = 386;
 
-            // Faixa do subtítulo integrada ao bloco da tabela
+            $this->drawSectionTitle($pdf, 10, $rccTitleY, 770, 22, 'CARTÃO DE CRÉDITO - RCC');
+
             $pdf->SetDrawColor(170, 170, 170);
             $pdf->SetFillColor(232, 236, 240);
-            $pdf->Rect(10, 352, 770, 20, 'DF');
+            $pdf->Rect(10, $rccSubtitleY, 770, 20, 'DF');
 
             $pdf->SetTextColor(130, 130, 130);
-            $pdf->SetFont($this->fontRegular, '', 9.5);
             $pdf->SetFont($this->fontRegular, '', 12);
-
-            $pdf->SetXY(18, 356);
+            $pdf->SetXY(18, $rccSubtitleY + 4);
             $pdf->Cell(740, 10, 'CONTRATOS ATIVOS E SUSPENSOS*', 0, 0, 'L');
             $pdf->SetTextColor(0, 0, 0);
 
-            $afterTableY = $this->drawGridTable($pdf, 10, 372, $columns, $this->mapCardRows($data['contratos_rcc']), 40, 6, 3);
+            $afterTableY = $this->drawGridTable(
+                $pdf,
+                10,
+                $rccTableY,
+                $columns,
+                $this->mapCardRows($data['contratos_rcc']),
+                40,
+                6,
+                3
+            );
 
             $this->writeText($pdf, 10, $afterTableY + 6, $this->fontRegular, 8, '* Contratos que comprometem a margem consignável');
 

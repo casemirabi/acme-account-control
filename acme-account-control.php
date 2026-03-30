@@ -41,7 +41,7 @@ if (!defined('ACME_PB_INTERNAL_KEY')) {
 if (!defined('ACME_CLT_BRIDGE_URL')) {
   // Exemplo (ajuste pro seu endpoint REAL):
   // define('ACME_CLT_BRIDGE_URL', 'https://api.maiscorban.net/pb/credito-privado/enqueue');
-  define('ACME_CLT_BRIDGE_URL', 'http://127.0.0.1:31827/pb/credito-privado/enqueue');
+  define('ACME_CLT_BRIDGE_URL', 'https://api.maiscorban.net/pb/credito-privado/enqueue');
 }
 
 if (!defined('ACME_CLT_BRIDGE_KEY')) {
@@ -53,7 +53,7 @@ if (!defined('ACME_CLT_BRIDGE_KEY')) {
  * Bridge do PB (consulta)
  */
 if (!defined('ACME_PB_BRIDGE_URL')) {
-  define('ACME_PB_BRIDGE_URL', 'http://127.0.0.1:31827/pb/credito-privado/consulta');
+  define('ACME_PB_BRIDGE_URL', 'https://api.maiscorban.net/pb/credito-privado/consulta');
 }
 
 if (!defined('ACME_INSS_BRIDGE_URL')) {
