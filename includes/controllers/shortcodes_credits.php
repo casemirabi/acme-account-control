@@ -2427,7 +2427,8 @@ if (!shortcode_exists('acme_credit_inventory_table')) {
 if (!function_exists('acme_render_my_profile_page_view')) {
   function acme_render_my_profile_page_view(array $profileSections = [])
   {
-    $viewFile = ACME_ACC_PATH . 'includes/views/my-profile-page.php';
+    $viewFile = ACME_ACC_PATH . 'includes/Modules/Users/Views/my-profile-page.php';
+    
 
     if (!file_exists($viewFile)) {
       return '<p>View do Meu Perfil não encontrada.</p>';
