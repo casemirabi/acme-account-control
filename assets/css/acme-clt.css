@@ -294,15 +294,26 @@
 }
 
 .acme-clt-modal__close {
-    border: 1px solid #cbd5e1;
-    background: #fff;
-    color: #0f172a;
-    border-radius: 10px;
-    min-width: 40px;
-    height: 40px;
-    cursor: pointer;
-    font-size: 24px;
-    line-height: 1;
+    display:flex;
+  align-items:center;
+  justify-content:center;
+
+  width:28px;
+  height:28px;
+  min-width:28px;
+  padding:0;
+
+  border:0;
+  border-radius:6px;
+  background:transparent;
+
+  cursor:pointer;
+
+  font-size:18px;
+  line-height:1;
+
+  /* 👇 ajuste fino que resolve o desalinhamento visual */
+  transform:translateY(-1px);
 }
 
 html.acme-clt-modal-open,
