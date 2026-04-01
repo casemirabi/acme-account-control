@@ -1823,7 +1823,7 @@ add_shortcode('acme_clt_panel', function () {
     <th>Elegibilidade</th>
     <th>Status</th>
     <th>Situação (Se erro)</th>
-    <th>PDF</th>
+    <th>Ações</th>
   </tr></thead><tbody>';
 
   foreach ($rows as $r) {
@@ -1850,7 +1850,7 @@ add_shortcode('acme_clt_panel', function () {
       }
     }
 
-    $pdfCell = '—';
+    $actionsCell = '—';
 
     $requestId = $r['request_id'] ?? '';
     $responseJson = $r['response_json'] ?? '';
@@ -1862,9 +1862,18 @@ add_shortcode('acme_clt_panel', function () {
         'request_id' => $requestId,
       ], admin_url('admin-ajax.php'));
 
-      $pdfCell = '<a class="acme-btn" target="_blank" rel="noopener" href="'
+      $viewBtn = '<button type="button" class="acme-btn acme-clt-view-btn" data-request-id="'
+        . esc_attr($requestId)
+        . '">Visualizar</button>';
+
+      $pdfBtn = '<a class="acme-btn" target="_blank" rel="noopener" href="'
         . esc_url($pdfUrl)
         . '">Baixar PDF</a>';
+
+      $actionsCell = '<div class="acme-clt-actions">'
+        . $viewBtn
+        . $pdfBtn
+        . '</div>';
     }
 
     $error = ($status === 'failed') ? "Houve um erro no processamento da consulta. \nRevise os dados, aguarde alguns instantes e tente novamente. Se o problema persistir, entre em contato com o administrador." : ''; //$error = $r['error_message'] ?? '';
@@ -1879,13 +1888,28 @@ add_shortcode('acme_clt_panel', function () {
     $out .= '<td class="acme-muted">' . esc_html($elegibilidade) . '</td>';
     $out .= '<td><span class="acme-badge ' . esc_attr($badgeClass) . '">' . esc_html($status_valor) . '</span></td>';
     $out .= '<td class="acme-col-error">' . esc_html($error) . '</td>'; //$out .= '<td>' . esc_html($error) . '</td>';
-    $out .= '<td>' . $pdfCell . '</td>';
+    $out .= '<td>' . $actionsCell . '</td>';
     $out .= '</tr>';
   }
 
   $out .= '</tbody></table>';
   $out .= '</div>';
 
+  $out .= '
+<div id="acme-clt-panel-modal" class="acme-clt-modal" hidden>
+  <div class="acme-clt-modal__backdrop" data-acme-clt-close="1"></div>
+
+  <div class="acme-clt-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="acme-clt-modal-title">
+    <div class="acme-clt-modal__head">
+      <div id="acme-clt-modal-title" class="acme-title">Visualizar consulta CLT</div>
+      <button type="button" class="acme-clt-modal__close" data-acme-clt-close="1" aria-label="Fechar">×</button>
+    </div>
+
+    <div class="acme-clt-modal__body">
+      <div class="acme-clt-panel-modal-result"></div>
+    </div>
+  </div>
+</div>';
   // =========================
   // 6) CONTROLES DE PAGINAÇÃO
   // =========================
@@ -2428,7 +2452,7 @@ if (!function_exists('acme_render_my_profile_page_view')) {
   function acme_render_my_profile_page_view(array $profileSections = [])
   {
     $viewFile = ACME_ACC_PATH . 'includes/Modules/Users/Views/my-profile-page.php';
-    
+
 
     if (!file_exists($viewFile)) {
       return '<p>View do Meu Perfil não encontrada.</p>';

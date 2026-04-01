@@ -523,6 +523,111 @@ function clearLastResult() {
     `;
   }
 
+  if (!window.ACME_CLT_UI || typeof window.ACME_CLT_UI !== 'object') {
+    window.ACME_CLT_UI = {};
+  }
+  window.ACME_CLT_UI.renderResultCard = renderResultCard;
+
+  async function fetchConsultaStatusByRequestId(requestId) {
+    const url = new URL(ACME_CLT.restStatus);
+    url.searchParams.set('request_id', String(requestId || ''));
+
+    const resp = await fetch(url.toString(), {
+      method: 'GET',
+      credentials: 'same-origin',
+      headers: {
+        'X-WP-Nonce': ACME_CLT.restNonce,
+      },
+    });
+
+    const text = await resp.text();
+    let json = null;
+
+    try {
+      json = JSON.parse(text);
+    } catch (e) { }
+
+    if (!resp.ok || !json || json.success !== true) {
+      throw new Error(
+        (json && (json.message || (json.error && json.error.message))) ||
+        'Não foi possível carregar a consulta.'
+      );
+    }
+
+    return json.data || {};
+  }
+
+  function initCltPanelViewer() {
+    const modal = document.getElementById('acme-clt-panel-modal');
+    if (!modal) return;
+
+    const resultBox = modal.querySelector('.acme-clt-panel-modal-result');
+    if (!resultBox) return;
+
+    const closeModal = () => {
+      modal.setAttribute('hidden', 'hidden');
+      document.documentElement.classList.remove('acme-clt-modal-open');
+      resultBox.innerHTML = '';
+    };
+
+    const openModal = () => {
+      modal.removeAttribute('hidden');
+      document.documentElement.classList.add('acme-clt-modal-open');
+    };
+
+    document.addEventListener('click', async (event) => {
+      const closeTrigger = event.target.closest('[data-acme-clt-close="1"]');
+      if (closeTrigger) {
+        closeModal();
+        return;
+      }
+
+      const viewBtn = event.target.closest('.acme-clt-view-btn');
+      if (!viewBtn) return;
+
+      event.preventDefault();
+
+      const requestId = String(viewBtn.getAttribute('data-request-id') || '').trim();
+      if (!requestId) return;
+
+      openModal();
+      resultBox.innerHTML = '<div class="acme-msg">Carregando consulta...</div>';
+
+      try {
+        const data = await fetchConsultaStatusByRequestId(requestId);
+
+        if (data.status === 'failed') {
+          const err = pickErrorMessage(data.error);
+          resultBox.innerHTML = '<div class="acme-msg acme-msg-err">' + err + '</div>';
+          return;
+        }
+
+        if (data.status !== 'completed') {
+          resultBox.innerHTML = '<div class="acme-msg">Consulta ainda não foi concluída.</div>';
+          return;
+        }
+
+        const dadosRaw = extractDadosFromStatus({ data });
+
+        if (!dadosRaw) {
+          resultBox.innerHTML = '<div class="acme-msg acme-msg-err">Consulta concluída, mas sem dados para exibir.</div>';
+          return;
+        }
+
+        renderResultCard(resultBox, dadosRaw, requestId);
+
+      } catch (error) {
+        resultBox.innerHTML = '<div class="acme-msg acme-msg-err">' + pickErrorMessage(error) + '</div>';
+      }
+    });
+
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && !modal.hasAttribute('hidden')) {
+        closeModal();
+      }
+    });
+  }
+
   // ============================================================
   // REST calls
   // ============================================================
@@ -826,4 +931,6 @@ function clearLastResult() {
       run();
     }
   });
+
+  initCltPanelViewer();
 })();
