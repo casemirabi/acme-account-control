@@ -47,3 +47,100 @@
     text-align: center;
   }
 }
+
+.acme-inss-actions{
+  display:inline-flex;
+  gap:8px;
+  flex-wrap:nowrap;
+  align-items:center;
+}
+
+.acme-inss-actions .acme-btn,
+.acme-inss-actions a,
+.acme-inss-actions button{
+  width:auto;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  white-space:nowrap;
+}
+
+.acme-inss-modal[hidden]{
+  display:none !important;
+}
+
+.acme-inss-modal{
+  position:fixed;
+  inset:0;
+  z-index:99999;
+}
+
+.acme-inss-modal__backdrop{
+  position:absolute;
+  inset:0;
+  background:rgba(15,23,42,.58);
+}
+
+.acme-inss-modal__dialog{
+  position:relative;
+  width:min(960px, calc(100vw - 32px));
+  max-height:calc(100vh - 32px);
+  overflow:auto;
+  margin:16px auto;
+  background:#fff;
+  border-radius:16px;
+  box-shadow:0 24px 80px rgba(15,23,42,.28);
+}
+
+.acme-inss-modal__head{
+  position:sticky;
+  top:0;
+  z-index:2;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding:16px 18px;
+  background:#fff;
+  border-bottom:1px solid #e2e8f0;
+}
+
+.acme-inss-modal__body{
+  padding:16px;
+}
+
+.acme-inss-modal__close{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+
+  width:28px;
+  height:28px;
+  min-width:28px;
+  padding:0;
+
+  border:0;
+  border-radius:6px;
+  background:transparent;
+
+  cursor:pointer;
+
+  font-size:18px;
+  line-height:1;
+
+  /* 👇 ajuste fino que resolve o desalinhamento visual */
+  transform:translateY(-1px);
+}
+
+.acme-inss-modal__close::before{
+  content:"×";
+  position:absolute;
+  top:50%;
+  left:50%;
+  transform:translate(-50%, -50%);
+}
+
+html.acme-inss-modal-open,
+html.acme-inss-modal-open body{
+  overflow:hidden;
+}

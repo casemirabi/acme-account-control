@@ -36,6 +36,57 @@ if (!defined('ABSPATH')) {
  * - Continua aceitando ?paged=2 (legado)
  * - Funciona também com /page/2/ (permalinks)
  */
+
+if (!function_exists('acme_register_inss_assets')) {
+  function acme_register_inss_assets()
+  {
+    $cssRelativePath = 'assets/css/acme-inss.css';
+    $jsRelativePath  = 'assets/js/acme-inss-form.js';
+
+    $cssFilePath = ACME_ACC_PATH . $cssRelativePath;
+    $cssFileUrl  = ACME_ACC_URL . $cssRelativePath;
+    $cssVersion  = file_exists($cssFilePath) ? (string) filemtime($cssFilePath) : '1.0.0';
+
+    $jsFilePath = ACME_ACC_PATH . $jsRelativePath;
+    $jsFileUrl  = ACME_ACC_URL . $jsRelativePath;
+    $jsVersion  = file_exists($jsFilePath) ? (string) filemtime($jsFilePath) : '1.0.0';
+
+    wp_register_style(
+      'acme-inss',
+      $cssFileUrl,
+      [],
+      $cssVersion
+    );
+
+    wp_register_script(
+      'acme-inss-form',
+      $jsFileUrl,
+      [],
+      $jsVersion,
+      true
+    );
+  }
+}
+add_action('wp_enqueue_scripts', 'acme_register_inss_assets');
+
+if (!function_exists('acme_enqueue_inss_assets')) {
+  function acme_enqueue_inss_assets()
+  {
+    wp_enqueue_style('acme-inss');
+    wp_enqueue_script('acme-inss-form');
+
+    wp_localize_script('acme-inss-form', 'ACME_INSS', [
+      'restStart'  => esc_url_raw(rest_url('acme/v1/api-inss')),
+      'restStatus' => esc_url_raw(rest_url('acme/v1/api-inss-status')),
+      'restNonce'  => wp_create_nonce('wp_rest'),
+      'pdfUrl'     => add_query_arg([
+        'action'   => 'acme_inss_pdf_request',
+        '_wpnonce' => wp_create_nonce('acme_inss_pdf_nonce'),
+      ], admin_url('admin-ajax.php')),
+    ]);
+  }
+}
+
 if (!function_exists('acme_normalize_pagination_param')) {
   function acme_normalize_pagination_param(string $preferred = 'acme_page', string $legacy = 'paged'): void
   {
@@ -211,6 +262,10 @@ add_shortcode('acme_clt_form', function () {
 
   if (!is_user_logged_in()) {
     return '<div style="padding:12px;border:1px solid #f2c;border-radius:10px;">Faça login para consultar.</div>';
+  }
+
+  if (function_exists('acme_enqueue_inss_assets')) {
+    acme_enqueue_inss_assets();
   }
 
   ob_start(); ?>
@@ -1555,6 +1610,10 @@ add_shortcode('acme_clt_panel', function () {
     return '<div style="padding:12px;border:1px solid #f2c;border-radius:10px;">Faça login para ver seu histórico.</div>';
   }
 
+  if (function_exists('acme_enqueue_inss_assets')) {
+    acme_enqueue_inss_assets();
+  }
+
   global $wpdb;
   $t = $wpdb->prefix . 'service_requests';
 
@@ -2822,6 +2881,56 @@ function acme_shortcode_grant_credits()
 }
 
 
+if (!function_exists('acme_register_inss_assets')) {
+  function acme_register_inss_assets()
+  {
+    $cssRelativePath = 'assets/css/acme-inss.css';
+    $jsRelativePath  = 'assets/js/acme-inss-form.js';
+
+    $cssFilePath = ACME_ACC_PATH . $cssRelativePath;
+    $cssFileUrl  = ACME_ACC_URL . $cssRelativePath;
+    $cssVersion  = file_exists($cssFilePath) ? (string) filemtime($cssFilePath) : '1.0.0';
+
+    $jsFilePath = ACME_ACC_PATH . $jsRelativePath;
+    $jsFileUrl  = ACME_ACC_URL . $jsRelativePath;
+    $jsVersion  = file_exists($jsFilePath) ? (string) filemtime($jsFilePath) : '1.0.0';
+
+    wp_register_style(
+      'acme-inss',
+      $cssFileUrl,
+      [],
+      $cssVersion
+    );
+
+    wp_register_script(
+      'acme-inss-form',
+      $jsFileUrl,
+      [],
+      $jsVersion,
+      true
+    );
+  }
+}
+add_action('wp_enqueue_scripts', 'acme_register_inss_assets');
+
+if (!function_exists('acme_enqueue_inss_assets')) {
+  function acme_enqueue_inss_assets()
+  {
+    wp_enqueue_style('acme-inss');
+    wp_enqueue_script('acme-inss-form');
+
+    wp_localize_script('acme-inss-form', 'ACME_INSS', [
+      'restStart' => esc_url_raw(rest_url('acme/v1/api-inss')),
+      'restStatus' => esc_url_raw(rest_url('acme/v1/api-inss-status')),
+      'restNonce' => wp_create_nonce('wp_rest'),
+      'pdfUrl' => add_query_arg([
+        'action' => 'acme_inss_pdf_request',
+        '_wpnonce' => wp_create_nonce('acme_inss_pdf_nonce'),
+      ], admin_url('admin-ajax.php')),
+    ]);
+  }
+}
+
 /**
  * Consulta INSS
  */
@@ -2837,6 +2946,10 @@ add_shortcode('acme_inss_panel', function () {
 
   if (!is_user_logged_in()) {
     return '<div style="padding:12px;border:1px solid #f2c;border-radius:10px;">Faça login para ver seu histórico.</div>';
+  }
+
+  if (function_exists('acme_enqueue_inss_assets')) {
+    acme_enqueue_inss_assets();
   }
 
   global $wpdb;
@@ -3221,7 +3334,7 @@ add_shortcode('acme_inss_panel', function () {
   $out .= '<th>Bloqueio</th>';
   $out .= '<th>Status</th>';
   $out .= '<th class="acme-col-error">Situação (Se erro)</th>';
-  $out .= '<th>PDF</th>';
+  $out .= '<th>Ações</th>';
   $out .= '</tr></thead><tbody>';
 
 
@@ -3285,32 +3398,32 @@ add_shortcode('acme_inss_panel', function () {
         : 'Houve um erro no processamento da consulta.';
     }
 
-    // =========================
-    // PDF
-    // =========================
-    $pdfCell = '—';
+    $actionsCell = '—';
 
     $requestId = $row['request_id'] ?? '';
+    $responseJson = $row['response_json'] ?? '';
 
-    $isCompletedStatus = in_array($statusNormalized, ['completed', 'complete', 'ok', 'success', 'done'], true);
-
-    if (
-      $isCompletedStatus &&
-      !empty($requestId) &&
-      !empty($responseJson)
-    ) {
+    if (!empty($requestId) && !empty($responseJson) && $statusNormalized === 'completed') {
       $pdfUrl = add_query_arg([
-        'action'    => 'acme_inss_pdf_request',
-        '_wpnonce'  => $noncePdf,
+        'action' => 'acme_inss_pdf_request',
+        '_wpnonce' => $noncePdf,
         'request_id' => $requestId,
       ], admin_url('admin-ajax.php'));
 
-      $pdfCell = '<a class="acme-btn" target="_blank" rel="noopener" href="' . esc_url($pdfUrl) . '">Baixar PDF</a>';
+      $viewBtn = '<button type="button" class="acme-btn acme-inss-view-btn" data-request-id="'
+        . esc_attr($requestId)
+        . '">Visualizar</button>';
+
+      $pdfBtn = '<a class="acme-btn" target="_blank" rel="noopener" href="'
+        . esc_url($pdfUrl)
+        . '">Baixar PDF</a>';
+
+      $actionsCell = '<div class="acme-inss-actions">'
+        . $viewBtn
+        . $pdfBtn
+        . '</div>';
     }
 
-    // =========================
-    // ROW
-    // =========================
     $out .= '<tr>';
     $out .= '<td class="acme-muted">' . esc_html($createdAt) . '</td>';
 
@@ -3325,7 +3438,7 @@ add_shortcode('acme_inss_panel', function () {
     $out .= '<td>' . esc_html($bloqueio) . '</td>';
     $out .= '<td><span class="acme-badge ' . esc_attr($badgeClass) . '">' . esc_html($statusLabel) . '</span></td>';
     $out .= '<td class="acme-col-error">' . esc_html($errorMessage) . '</td>';
-    $out .= '<td>' . $pdfCell . '</td>';
+    $out .= '<td>' . $actionsCell . '</td>';
     $out .= '</tr>';
   }
 
@@ -3374,6 +3487,22 @@ add_shortcode('acme_inss_panel', function () {
 
   $out .= '</div>';
 
+  $out .= '
+<div id="acme-inss-panel-modal" class="acme-inss-modal" hidden>
+  <div class="acme-inss-modal__backdrop" data-acme-inss-close="1"></div>
+
+  <div class="acme-inss-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="acme-inss-modal-title">
+    <div class="acme-inss-modal__head">
+      <div id="acme-inss-modal-title" class="acme-title">Visualizar consulta INSS</div>
+      <button type="button" class="acme-inss-modal__close" data-acme-inss-close="1" aria-label="Fechar">×</button>
+    </div>
+
+    <div class="acme-inss-modal__body">
+      <div class="acme-inss-panel-modal-result"></div>
+    </div>
+  </div>
+</div>';
+
   return $out;
 });
 
@@ -3388,6 +3517,11 @@ add_shortcode('acme_inss_form', 'acme_shortcode_inss_form');
 
 function acme_shortcode_inss_form()
 {
+
+  if (function_exists('acme_enqueue_inss_assets')) {
+    acme_enqueue_inss_assets();
+  }
+  
   ob_start();
 ?>
   <div class="acme-card acme-inss-shell">
