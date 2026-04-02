@@ -18,7 +18,9 @@ if (!function_exists('acme_users_registration_handle_create_user')) {
         $actor = wp_get_current_user();
         $is_admin = user_can($actor_id, 'administrator');
         $is_child = in_array('child', (array) $actor->roles, true);
-        $redirect_base = wp_get_referer() ?: site_url('/add-user/');
+        $redirect_base = isset($_POST['redirect_to']) && !empty($_POST['redirect_to'])
+            ? esc_url_raw(wp_unslash((string) $_POST['redirect_to']))
+            : (wp_get_referer() ?: site_url('/add-user/'));
 
         if (!$is_admin && !$is_child) {
             wp_die('Sem permissão.');
@@ -112,7 +114,14 @@ if (!function_exists('acme_users_registration_handle_create_user')) {
             acme_users_repo_insert_link((int) $parent_child_id, (int) $user_id, 2);
         }
 
-        wp_safe_redirect(add_query_arg('acme_msg', 'created', site_url('/add-user/')));
+        $view_page_url = site_url('/view-user/');
+        $view_url = add_query_arg([
+            'user_id'  => (int) $user_id,
+            'nonce'    => wp_create_nonce('acme_edit_user_' . (int) $user_id),
+            'acme_msg' => 'created',
+        ], $view_page_url);
+
+        wp_safe_redirect($view_url);
         exit;
     }
 }

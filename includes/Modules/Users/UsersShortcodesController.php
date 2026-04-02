@@ -28,7 +28,7 @@ if (!function_exists('acme_users_register_shortcodes')) {
                     return '<p>Erro interno (' . esc_html($tag) . ').</p>';
                 }
 
-                if ($tag === 'acme_my_grandchildren_manage') {
+                if (in_array($tag, ['acme_my_grandchildren_manage', 'acme_add_user'], true)) {
                     return call_user_func($callback, $atts);
                 }
 
@@ -128,6 +128,16 @@ if (!function_exists('acme_shortcode_my_grandchildren_manage')) {
         $messages = $screenData['messages'];
         $childrenForFilter = $screenData['childrenForFilter'];
         $scopeIds = $screenData['scopeIds'];
+
+        $addUserPageUrl = site_url('/add-user/');
+        $addUserButtonLabel = 'Adicionar usuários';
+        $addUserModalHtml = function_exists('acme_shortcode_add_user')
+            ? acme_shortcode_add_user([
+                'context' => 'modal',
+                'redirect_to' => $baseUrl,
+                'fallback_url' => $addUserPageUrl,
+            ])
+            : '';
 
         ob_start();
         echo function_exists('acme_ui_panel_css') ? acme_ui_panel_css() : '';
@@ -526,7 +536,7 @@ function acme_shortcode_view_user()
  * 13) SHORTCODE Adicionar Usuarios (Elementor): [acme_add_user]
  * ============================================================
  */
-function acme_shortcode_add_user()
+function acme_shortcode_add_user($atts = [])
 {
 
     if (!is_user_logged_in()) {
@@ -544,6 +554,12 @@ function acme_shortcode_add_user()
       <div class="acme-panel-sub">Ops! Este conteúdo é restrito. Para continuar, fale com o administrador ou solicite acesso.</div>
     </div>';
     }
+
+    $atts = is_array($atts) ? $atts : [];
+    $context = isset($atts['context']) ? sanitize_key((string) $atts['context']) : 'page';
+    $redirectTo = isset($atts['redirect_to']) ? esc_url_raw((string) $atts['redirect_to']) : '';
+    $fallbackUrl = isset($atts['fallback_url']) ? esc_url_raw((string) $atts['fallback_url']) : '';
+    $isModalContext = ($context === 'modal');
 
     $allowed_roles = $is_admin ? ['grandchild', 'child'] : ['grandchild'];
 
@@ -565,7 +581,7 @@ function acme_shortcode_add_user()
     }
 
     $back_url      = wp_get_referer() ?: site_url('/');
-    $home_url = home_url('/');
+    $home_url = $fallbackUrl ? $fallbackUrl : ($redirectTo ? $redirectTo : home_url('/'));
 
     ob_start();
 
@@ -581,10 +597,12 @@ function acme_shortcode_add_user()
                 <div class="acme-panel-sub">Crie Master (Filho) ou Sub-login (Neto) conforme seu nível de acesso.</div>
             </div>
 
-            <div class="acme-form-actions">
-                <a class="acme-btn" style="background:#fff;color:#0f172a;border:1px solid #e2e8f0;"
-                    href="<?php echo esc_url($home_url); ?>">← Voltar</a>
-            </div>
+            <?php if (!$isModalContext): ?>
+                <div class="acme-form-actions">
+                    <a class="acme-btn" style="background:#fff;color:#0f172a;border:1px solid #e2e8f0;"
+                        href="<?php echo esc_url($home_url); ?>">← Voltar</a>
+                </div>
+            <?php endif; ?>
         </div>
 
         <?php if (isset($_GET['acme_msg']) && $_GET['acme_msg'] === 'created'): ?>
@@ -611,6 +629,7 @@ function acme_shortcode_add_user()
             class="acme-form-col">
 
             <input type="hidden" name="action" value="acme_fe_create_user">
+            <input type="hidden" name="redirect_to" value="<?php echo esc_attr($redirectTo); ?>">
             <?php wp_nonce_field('acme_fe_create_user'); ?>
 
             <div class="acme-field" style="margin-bottom:1%">

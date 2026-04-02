@@ -146,6 +146,14 @@ if (!function_exists('acme_users_manage_get_messages')) {
             $messages[] = ['style' => $styles['success'], 'text' => 'Senha alterada e sessão do usuário encerrada.'];
         } elseif ($messageCode === 'phone') {
             $messages[] = ['style' => $styles['success'], 'text' => 'Telefone atualizado.'];
+        } elseif ($messageCode === 'created') {
+            $messages[] = ['style' => $styles['success'], 'text' => 'Usuário criado com sucesso.'];
+        } elseif ($messageCode === 'error') {
+            $messages[] = ['style' => $styles['danger'], 'text' => $errorMessage ?: 'Erro ao criar usuário. Verifique os dados informados.'];
+        } elseif ($messageCode === 'missing_parent') {
+            $messages[] = ['style' => $styles['warn'], 'text' => 'Selecione um Master responsável ativo para criar o Sub-Login.'];
+        } elseif ($messageCode === 'parent_inactive') {
+            $messages[] = ['style' => $styles['warn'], 'text' => 'Não é permitido criar Sub-Login para Master inativo.'];
         } elseif ($messageCode === 'bulk_ok') {
             $count = isset($_GET['bulk_count']) ? (int) $_GET['bulk_count'] : 0;
             $messages[] = ['style' => $styles['success'], 'text' => 'Ativação em massa concluída. Usuários ativados: ' . $count . '.'];

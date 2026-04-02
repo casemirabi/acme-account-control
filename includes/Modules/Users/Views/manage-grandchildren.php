@@ -14,6 +14,14 @@ if (!defined('ABSPATH')) {
         <div class="acme-actions">
             <a class="acme-btn" href="<?php echo esc_url($baseUrl); ?>">Atualizar</a>
 
+            <a
+                class="acme-btn"
+                href="<?php echo esc_url($addUserPageUrl); ?>"
+                data-acme-open-add-user-modal="1"
+                data-acme-fallback-url="<?php echo esc_url($addUserPageUrl); ?>">
+                <?php echo esc_html($addUserButtonLabel); ?>
+            </a>
+
             <?php echo do_shortcode('[acme_export_button report="users" label="Baixar usuários" class="acme-btn"]'); ?>
 
             <?php if ($hasAnyFilter): ?>
@@ -233,6 +241,83 @@ if (!defined('ABSPATH')) {
                 all.addEventListener('change', function() {
                     document.querySelectorAll('.acme_chk_one').forEach(cb => cb.checked = all.checked);
                 });
+            })();
+        </script>
+
+        <div
+            id="acme-add-user-modal"
+            aria-hidden="true"
+            style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(15,23,42,.55);padding:24px;overflow:auto;">
+
+            <div
+                style="max-width:760px;margin:40px auto;background:#fff;border-radius:16px;box-shadow:0 20px 40px rgba(0,0,0,.18);overflow:hidden;position:relative;">
+
+                <button
+                    type="button"
+                    id="acme-add-user-modal-close"
+                    aria-label="Fechar"
+                    style="position:absolute;top:12px;right:12px;border:1px solid #e2e8f0;background:#fff;border-radius:10px;padding:8px 10px;cursor:pointer;font-weight:700;z-index:2;">
+                    ×
+                </button>
+
+                <div style="padding:0;">
+                    <?php echo $addUserModalHtml; ?>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            (function() {
+                const openButton = document.querySelector('[data-acme-open-add-user-modal="1"]');
+                const modal = document.getElementById('acme-add-user-modal');
+                const closeButton = document.getElementById('acme-add-user-modal-close');
+                const shouldAutoOpenModal = <?php echo !empty($_GET['acme_msg']) && in_array(sanitize_text_field(wp_unslash($_GET['acme_msg'])), ['error', 'missing_parent', 'parent_inactive'], true) ? 'true' : 'false'; ?>;
+
+                if (!openButton || !modal || !closeButton) {
+                    return;
+                }
+
+                function openModal() {
+                    modal.style.display = 'block';
+                    modal.setAttribute('aria-hidden', 'false');
+                    document.body.style.overflow = 'hidden';
+                }
+
+                function closeModal() {
+                    modal.style.display = 'none';
+                    modal.setAttribute('aria-hidden', 'true');
+                    document.body.style.overflow = '';
+                }
+
+                openButton.addEventListener('click', function(event) {
+                    event.preventDefault();
+
+                    try {
+                        openModal();
+                    } catch (error) {
+                        window.location.href = openButton.getAttribute('data-acme-fallback-url');
+                    }
+                });
+
+                closeButton.addEventListener('click', closeModal);
+
+                modal.addEventListener('click', function(event) {
+                    if (event.target === modal) {
+                        closeModal();
+                    }
+                });
+
+                document.addEventListener('keydown', function(event) {
+                    if (event.key === 'Escape' && modal.getAttribute('aria-hidden') === 'false') {
+                        closeModal();
+                    }
+                });
+
+                if (shouldAutoOpenModal) {
+                    try {
+                        openModal();
+                    } catch (error) {}
+                }
             })();
         </script>
 
