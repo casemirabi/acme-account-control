@@ -593,6 +593,9 @@ add_filter('acme_export_registry', function ($r) {
   // ============================================================
   // REPORT: clt_history (Histórico CLT com filtros da tela)
   // ============================================================
+  // ============================================================
+  // REPORT: clt_history (Histórico CLT com filtros da tela)
+  // ============================================================
   $r['clt_history'] = [
     'columns' => [
       'created_at' => 'Criado',
@@ -604,14 +607,13 @@ add_filter('acme_export_registry', function ($r) {
       'observacao' => 'Observação',
     ],
 
-    // Mantém o mesmo nome dos GET da tela:
-    // clt_user, clt_status, clt_cpf, clt_date_from, clt_date_to
     'filters' => [
-      'clt_user' => ['type' => 'text', 'default' => ''], // admin: id OU nome/email
+      'clt_user' => ['type' => 'text', 'default' => ''],
       'clt_status' => ['type' => 'enum', 'default' => '', 'allowed' => ['pending', 'completed', 'failed']],
       'clt_cpf' => ['type' => 'text', 'default' => ''],
       'clt_date_from' => ['type' => 'date', 'default' => ''],
       'clt_date_to' => ['type' => 'date', 'default' => ''],
+      'clt_elegibilidade' => ['type' => 'enum', 'default' => '', 'allowed' => ['Elegivel', 'NaoElegivel']],
     ],
 
     'chunk_size' => 500,
@@ -620,39 +622,91 @@ add_filter('acme_export_registry', function ($r) {
 
     'normalize_state' => function ($state) {
       $viewer_id = get_current_user_id();
-      $is_admin = current_user_can('manage_options');
+      $current_user = wp_get_current_user();
 
-      // Normaliza datas para montar range no fetch()
+      $is_admin = current_user_can('manage_options');
+      $is_master = function_exists('acme_user_has_role') && acme_user_has_role($current_user, 'child');
+
+      $visible_user_ids = function_exists('acme_get_credit_table_visible_user_ids')
+        ? acme_get_credit_table_visible_user_ids()
+        : [$viewer_id];
+
+      $visible_user_ids = array_values(array_unique(array_map('intval', (array) $visible_user_ids)));
+
+      if (empty($visible_user_ids)) {
+        $visible_user_ids = [$viewer_id];
+      }
+
       $state['dt_from'] = !empty($state['clt_date_from']) ? ($state['clt_date_from'] . ' 00:00:00') : '';
       $state['dt_to'] = !empty($state['clt_date_to']) ? ($state['clt_date_to'] . ' 23:59:59') : '';
 
-      // Permissão: não-admin só exporta dele
-      if (!$is_admin) {
+      $allowed_elegibilidade = ['Elegivel', 'NaoElegivel'];
+      $state['clt_elegibilidade'] = in_array((string) ($state['clt_elegibilidade'] ?? ''), $allowed_elegibilidade, true)
+        ? (string) $state['clt_elegibilidade']
+        : '';
+
+      if (!$is_admin && !$is_master) {
         $state['target_mode'] = 'id';
         $state['target_id'] = (int) $viewer_id;
-
-        // zera filtros admin-only
+        $state['target_q'] = '';
+        $state['visible_user_ids'] = [$viewer_id];
         $state['clt_user'] = '';
         return $state;
       }
 
-      // Admin: pode exportar todos (sem filtro) ou filtrar por usuário
+      if ($is_admin) {
+        $u = trim((string) ($state['clt_user'] ?? ''));
+
+        if ($u === '') {
+          $state['target_mode'] = 'all';
+          $state['target_id'] = 0;
+          $state['target_q'] = '';
+          $state['visible_user_ids'] = [];
+          return $state;
+        }
+
+        if (ctype_digit($u)) {
+          $state['target_mode'] = 'id';
+          $state['target_id'] = (int) $u;
+          $state['target_q'] = '';
+          $state['visible_user_ids'] = [];
+        } else {
+          $state['target_mode'] = 'q';
+          $state['target_id'] = 0;
+          $state['target_q'] = $u;
+          $state['visible_user_ids'] = [];
+        }
+
+        return $state;
+      }
+
+      // master/child
+      $state['target_mode'] = 'visible';
+      $state['target_id'] = 0;
+      $state['target_q'] = '';
+      $state['visible_user_ids'] = $visible_user_ids;
+
       $u = trim((string) ($state['clt_user'] ?? ''));
+
       if ($u === '') {
-        $state['target_mode'] = 'all';   // todos
-        $state['target_id'] = 0;
-        $state['target_q'] = '';
         return $state;
       }
 
       if (ctype_digit($u)) {
-        $state['target_mode'] = 'id';
-        $state['target_id'] = (int) $u;
-        $state['target_q'] = '';
+        $filtered_user_id = (int) $u;
+
+        if (in_array($filtered_user_id, $visible_user_ids, true)) {
+          $state['target_mode'] = 'id';
+          $state['target_id'] = $filtered_user_id;
+          $state['target_q'] = '';
+        } else {
+          $state['target_mode'] = 'none';
+          $state['target_id'] = 0;
+          $state['target_q'] = '';
+        }
       } else {
-        $state['target_mode'] = 'q';
-        $state['target_id'] = 0;
-        $state['target_q'] = $u; // nome/email
+        $state['target_mode'] = 'visible_q';
+        $state['target_q'] = $u;
       }
 
       return $state;
@@ -667,11 +721,9 @@ add_filter('acme_export_registry', function ($r) {
       $where = [];
       $params = [];
 
-      // Garantia explícita: exportar somente registros do serviço CLT
       $where[] = 't.service_slug = %s';
       $params[] = 'clt';
 
-      // Usuário alvo (admin e não-admin)
       $mode = (string) ($state['target_mode'] ?? 'all');
 
       if ($mode === 'id') {
@@ -682,30 +734,60 @@ add_filter('acme_export_registry', function ($r) {
         $where[] = '(u.display_name LIKE %s OR u.user_email LIKE %s)';
         $params[] = $like;
         $params[] = $like;
-      } // 'all' => sem filtro
+      } elseif ($mode === 'visible' || $mode === 'visible_q') {
+        $visible_user_ids = array_values(array_unique(array_map('intval', (array) ($state['visible_user_ids'] ?? []))));
 
-      // Status
-      $st = (string) ($state['clt_status'] ?? '');
-      if ($st !== '') {
-        $where[] = 't.status = %s';
-        $params[] = $st;
+        if (empty($visible_user_ids)) {
+          return [];
+        }
+
+        $placeholders = implode(',', array_fill(0, count($visible_user_ids), '%d'));
+        $where[] = "t.user_id IN ({$placeholders})";
+        $params = array_merge($params, $visible_user_ids);
+
+        if ($mode === 'visible_q') {
+          $like = '%' . $wpdb->esc_like((string) ($state['target_q'] ?? '')) . '%';
+          $where[] = '(u.display_name LIKE %s OR u.user_email LIKE %s)';
+          $params[] = $like;
+          $params[] = $like;
+        }
+      } elseif ($mode === 'none') {
+        return [];
       }
 
-      // CPF: 11 dígitos => cpf_hash (exato), senão => cpf_masked LIKE
+      $status = (string) ($state['clt_status'] ?? '');
+      if ($status !== '') {
+        $where[] = 't.status = %s';
+        $params[] = $status;
+      }
+
+      $elegibilidade = (string) ($state['clt_elegibilidade'] ?? '');
+      if ($elegibilidade === 'NaoElegivel') {
+        $where[] = "(
+          t.error_code = 'nao_elegivel'
+          OR (t.status = 'completed' AND (t.response_json IS NULL OR t.response_json = ''))
+        )";
+      } elseif ($elegibilidade === 'Elegivel') {
+        $where[] = "(
+          t.status != 'pending'
+          AND (t.error_code IS NULL OR t.error_code <> 'nao_elegivel')
+          AND NOT (t.status = 'completed' AND (t.response_json IS NULL OR t.response_json = ''))
+        )";
+      }
+
       $cpf_raw = (string) ($state['clt_cpf'] ?? '');
       if ($cpf_raw !== '') {
         $cpf_numbers = preg_replace('/\D/', '', $cpf_raw);
 
         if (strlen($cpf_numbers) === 11) {
           $where[] = 't.cpf_hash = %s';
-          $params[] = hash('sha256', $cpf_numbers); // igual ao padrão que você grava
+          $params[] = acme_cpf_hash($cpf_numbers);
         } else {
           $where[] = 't.cpf_masked LIKE %s';
           $params[] = '%' . $wpdb->esc_like($cpf_raw) . '%';
         }
       }
 
-      // Datas (created_at)
       $dt_from = (string) ($state['dt_from'] ?? '');
       $dt_to = (string) ($state['dt_to'] ?? '');
 
@@ -721,22 +803,19 @@ add_filter('acme_export_registry', function ($r) {
         $params[] = $dt_to;
       }
 
-      $where_sql = '';
-      if (!empty($where)) {
-        $where_sql = 'WHERE ' . implode(' AND ', $where);
-      }
+      $where_sql = !empty($where) ? ('WHERE ' . implode(' AND ', $where)) : '';
 
       $sql = "
-      SELECT
-        t.*,
-        u.display_name,
-        u.user_email
-      FROM {$t} t
-      LEFT JOIN {$usersT} u ON u.ID = t.user_id
-      {$where_sql}
-      ORDER BY t.created_at DESC
-      LIMIT %d OFFSET %d
-    ";
+        SELECT
+          t.*,
+          u.display_name,
+          u.user_email
+        FROM {$t} t
+        LEFT JOIN {$usersT} u ON u.ID = t.user_id
+        {$where_sql}
+        ORDER BY t.created_at DESC
+        LIMIT %d OFFSET %d
+      ";
 
       $params[] = (int) $limit;
       $params[] = (int) $offset;

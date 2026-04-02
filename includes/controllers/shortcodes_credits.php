@@ -1615,267 +1615,320 @@ add_shortcode('acme_clt_panel', function () {
   }
 
   global $wpdb;
-  $t = $wpdb->prefix . 'service_requests';
+  $serviceRequestsTable = $wpdb->prefix . 'service_requests';
 
-  $me = get_current_user_id();
-  $is_admin = current_user_can('manage_options');
+  $currentUserId = get_current_user_id();
+  $currentUser = wp_get_current_user();
+
+  $isAdmin = current_user_can('manage_options');
+  $isMaster = function_exists('acme_user_has_role') && acme_user_has_role($currentUser, 'child');
+  $isSublogin = function_exists('acme_user_has_role') && acme_user_has_role($currentUser, 'grandchild');
+
+  $canFilterUser = $isAdmin || $isMaster;
+
+  $visibleUserIds = function_exists('acme_get_credit_table_visible_user_ids')
+    ? acme_get_credit_table_visible_user_ids()
+    : [$currentUserId];
+
+  $visibleUserIds = array_values(array_unique(array_map('intval', (array) $visibleUserIds)));
+
+  if (empty($visibleUserIds)) {
+    $visibleUserIds = [$currentUserId];
+  }
 
   // =========================
   // 0) PAGINAÇÃO (GET)
   // =========================
-  $per_page = 30;
-  $page = isset($_GET['clt_page']) ? max(1, (int)$_GET['clt_page']) : 1;
-  $offset = ($page - 1) * $per_page;
+  $perPage = 30;
+  $page = isset($_GET['clt_page']) ? max(1, (int) $_GET['clt_page']) : 1;
+  $offset = ($page - 1) * $perPage;
 
   // =========================
   // 1) LER FILTROS (GET)
   // =========================
-  $f_status    = isset($_GET['clt_status']) ? sanitize_text_field($_GET['clt_status']) : '';
-  $f_cpf_raw   = isset($_GET['clt_cpf']) ? sanitize_text_field($_GET['clt_cpf']) : '';
-  $f_user      = isset($_GET['clt_user']) ? sanitize_text_field($_GET['clt_user']) : '';
-  $f_date_from = isset($_GET['clt_date_from']) ? sanitize_text_field($_GET['clt_date_from']) : '';
-  $f_date_to   = isset($_GET['clt_date_to']) ? sanitize_text_field($_GET['clt_date_to']) : '';
-  $f_elegibilidade = isset($_GET['clt_elegibilidade']) ? sanitize_text_field($_GET['clt_elegibilidade']) : '';
+  $filterStatus = isset($_GET['clt_status']) ? sanitize_text_field($_GET['clt_status']) : '';
+  $filterCpfRaw = isset($_GET['clt_cpf']) ? sanitize_text_field($_GET['clt_cpf']) : '';
+  $filterUser = isset($_GET['clt_user']) ? sanitize_text_field($_GET['clt_user']) : '';
+  $filterDateFrom = isset($_GET['clt_date_from']) ? sanitize_text_field($_GET['clt_date_from']) : '';
+  $filterDateTo = isset($_GET['clt_date_to']) ? sanitize_text_field($_GET['clt_date_to']) : '';
+  $filterElegibilidade = isset($_GET['clt_elegibilidade']) ? sanitize_text_field($_GET['clt_elegibilidade']) : '';
 
-  // Status permitido
-  $allowed_status = ['pending', 'completed', 'failed'];
-  if ($f_status && !in_array($f_status, $allowed_status, true)) {
-    $f_status = '';
+  $allowedStatus = ['pending', 'completed', 'failed'];
+  if ($filterStatus && !in_array($filterStatus, $allowedStatus, true)) {
+    $filterStatus = '';
   }
 
-  // Datas (input type="date" => YYYY-MM-DD)
-  $dt_from = '';
-  $dt_to = '';
-  if ($f_date_from && preg_match('/^\d{4}-\d{2}-\d{2}$/', $f_date_from)) {
-    $dt_from = $f_date_from . ' 00:00:00';
+  $dateTimeFrom = '';
+  $dateTimeTo = '';
+
+  if ($filterDateFrom && preg_match('/^\d{4}-\d{2}-\d{2}$/', $filterDateFrom)) {
+    $dateTimeFrom = $filterDateFrom . ' 00:00:00';
   }
-  if ($f_date_to && preg_match('/^\d{4}-\d{2}-\d{2}$/', $f_date_to)) {
-    $dt_to = $f_date_to . ' 23:59:59';
+
+  if ($filterDateTo && preg_match('/^\d{4}-\d{2}-\d{2}$/', $filterDateTo)) {
+    $dateTimeTo = $filterDateTo . ' 23:59:59';
   }
 
   // =========================
   // 2) MONTAR WHERE (CASCATA)
   // =========================
-  $where = [];
-  $params = [];
+  $whereClauses = [];
+  $queryParams = [];
 
-  // Garantia explícita: este painel mostra somente requisições do serviço CLT
-  $where[] = 't.service_slug = %s';
-  $params[] = 'clt';
+  $whereClauses[] = 't.service_slug = %s';
+  $queryParams[] = 'clt';
 
-  // Usuário normal: sempre vê só o dele
-  if (!$is_admin) {
-    $where[] = 't.user_id = %d';
-    $params[] = $me;
-  } else {
-    // Admin: filtro por usuário pode ser ID (exato) ou nome/email (LIKE)
-    if ($f_user !== '') {
-      if (ctype_digit($f_user)) {
-        $where[] = 't.user_id = %d';
-        $params[] = (int)$f_user;
+  if ($isAdmin) {
+    if ($filterUser !== '') {
+      if (ctype_digit($filterUser)) {
+        $whereClauses[] = 't.user_id = %d';
+        $queryParams[] = (int) $filterUser;
       } else {
-        $like = '%' . $wpdb->esc_like($f_user) . '%';
-        $where[] = '(u.display_name LIKE %s OR u.user_email LIKE %s)';
-        $params[] = $like;
-        $params[] = $like;
+        $likeUser = '%' . $wpdb->esc_like($filterUser) . '%';
+        $whereClauses[] = '(u.display_name LIKE %s OR u.user_email LIKE %s)';
+        $queryParams[] = $likeUser;
+        $queryParams[] = $likeUser;
       }
     }
+  } elseif ($isMaster) {
+    $visibleUserPlaceholders = implode(',', array_fill(0, count($visibleUserIds), '%d'));
+    $whereClauses[] = "t.user_id IN ({$visibleUserPlaceholders})";
+    $queryParams = array_merge($queryParams, $visibleUserIds);
+
+    if ($filterUser !== '') {
+      if (ctype_digit($filterUser)) {
+        $filteredUserId = (int) $filterUser;
+
+        if (in_array($filteredUserId, $visibleUserIds, true)) {
+          $whereClauses[] = 't.user_id = %d';
+          $queryParams[] = $filteredUserId;
+        } else {
+          $whereClauses[] = '1 = 0';
+        }
+      } else {
+        $likeUser = '%' . $wpdb->esc_like($filterUser) . '%';
+        $whereClauses[] = '(u.display_name LIKE %s OR u.user_email LIKE %s)';
+        $queryParams[] = $likeUser;
+        $queryParams[] = $likeUser;
+      }
+    }
+  } else {
+    $whereClauses[] = 't.user_id = %d';
+    $queryParams[] = $currentUserId;
   }
 
-  // Status
-  if ($f_status) {
-    $where[] = 't.status = %s';
-    $params[] = $f_status;
+  if ($filterStatus) {
+    $whereClauses[] = 't.status = %s';
+    $queryParams[] = $filterStatus;
   }
 
-  // Elegibilidade (campo virtual)
-  if ($f_elegibilidade === 'NaoElegivel') {
-    $where[] = "(
+  if ($filterElegibilidade === 'NaoElegivel') {
+    $whereClauses[] = "(
       t.error_code = 'nao_elegivel'
       OR (t.status = 'completed' AND (t.response_json IS NULL OR t.response_json = ''))
     )";
   }
 
-  if ($f_elegibilidade === 'Elegivel') {
-    $where[] = "(
+  if ($filterElegibilidade === 'Elegivel') {
+    $whereClauses[] = "(
       t.status != 'pending'
       AND (t.error_code IS NULL OR t.error_code <> 'nao_elegivel')
       AND NOT (t.status = 'completed' AND (t.response_json IS NULL OR t.response_json = ''))
     )";
   }
 
-  // CPF (EXATO por hash quando 11 dígitos; parcial por cpf_masked LIKE)
-  if ($f_cpf_raw !== '') {
-    $cpf_numbers = preg_replace('/\D/', '', $f_cpf_raw);
+  if ($filterCpfRaw !== '') {
+    $cpfNumbers = preg_replace('/\D/', '', $filterCpfRaw);
 
-    if (strlen($cpf_numbers) === 11) {
-      $where[] = 't.cpf_hash = %s';
-      $params[] = acme_cpf_hash($cpf_numbers);
+    if (strlen($cpfNumbers) === 11) {
+      $whereClauses[] = 't.cpf_hash = %s';
+      $queryParams[] = acme_cpf_hash($cpfNumbers);
     } else {
-      $likeCpf = '%' . $wpdb->esc_like($f_cpf_raw) . '%';
-      $where[] = 't.cpf_masked LIKE %s';
-      $params[] = $likeCpf;
+      $likeCpf = '%' . $wpdb->esc_like($filterCpfRaw) . '%';
+      $whereClauses[] = 't.cpf_masked LIKE %s';
+      $queryParams[] = $likeCpf;
     }
   }
 
-  // Datas
-  if ($dt_from && $dt_to) {
-    $where[] = '(t.created_at BETWEEN %s AND %s)';
-    $params[] = $dt_from;
-    $params[] = $dt_to;
-  } elseif ($dt_from) {
-    $where[] = 't.created_at >= %s';
-    $params[] = $dt_from;
-  } elseif ($dt_to) {
-    $where[] = 't.created_at <= %s';
-    $params[] = $dt_to;
+  if ($dateTimeFrom && $dateTimeTo) {
+    $whereClauses[] = '(t.created_at BETWEEN %s AND %s)';
+    $queryParams[] = $dateTimeFrom;
+    $queryParams[] = $dateTimeTo;
+  } elseif ($dateTimeFrom) {
+    $whereClauses[] = 't.created_at >= %s';
+    $queryParams[] = $dateTimeFrom;
+  } elseif ($dateTimeTo) {
+    $whereClauses[] = 't.created_at <= %s';
+    $queryParams[] = $dateTimeTo;
   }
 
-  $where_sql = '';
-  if (!empty($where)) {
-    $where_sql = 'WHERE ' . implode(' AND ', $where);
+  $whereSql = '';
+  if (!empty($whereClauses)) {
+    $whereSql = 'WHERE ' . implode(' AND ', $whereClauses);
   }
 
   // =========================
   // 3) TOTAL (COUNT) p/ paginação
   // =========================
-  $sql_count = "
+  $countSql = "
     SELECT COUNT(*)
-    FROM {$t} t
+    FROM {$serviceRequestsTable} t
     LEFT JOIN {$wpdb->users} u ON u.ID = t.user_id
-    {$where_sql}
+    {$whereSql}
   ";
-  if (!empty($params)) {
-    $sql_count = $wpdb->prepare($sql_count, $params);
-  }
-  $total = (int)$wpdb->get_var($sql_count);
-  $total_pages = max(1, (int)ceil($total / $per_page));
 
-  // Se alguém colar page maior que o total, joga pra última
-  if ($page > $total_pages) {
-    $page = $total_pages;
-    $offset = ($page - 1) * $per_page;
+  if (!empty($queryParams)) {
+    $countSql = $wpdb->prepare($countSql, $queryParams);
+  }
+
+  $totalRows = (int) $wpdb->get_var($countSql);
+  $totalPages = max(1, (int) ceil($totalRows / $perPage));
+
+  if ($page > $totalPages) {
+    $page = $totalPages;
+    $offset = ($page - 1) * $perPage;
   }
 
   // =========================
   // 4) QUERY FINAL (LIMIT/OFFSET)
   // =========================
-  $sql = "
+  $listSql = "
     SELECT t.*, u.display_name, u.user_email
-    FROM {$t} t
+    FROM {$serviceRequestsTable} t
     LEFT JOIN {$wpdb->users} u ON u.ID = t.user_id
-    {$where_sql}
+    {$whereSql}
     ORDER BY t.created_at DESC
     LIMIT %d OFFSET %d
   ";
 
-  $params_page = $params;
-  $params_page[] = (int)$per_page;
-  $params_page[] = (int)$offset;
+  $listParams = $queryParams;
+  $listParams[] = (int) $perPage;
+  $listParams[] = (int) $offset;
 
-  $sql = $wpdb->prepare($sql, $params_page);
-  $rows = $wpdb->get_results($sql, ARRAY_A);
+  $listSql = $wpdb->prepare($listSql, $listParams);
+  $rows = $wpdb->get_results($listSql, ARRAY_A);
 
-  $nonce_pdf = wp_create_nonce('acme_clt_pdf_nonce');
+  $noncePdf = wp_create_nonce('acme_clt_pdf_nonce');
 
   // =========================
   // 5) UI
   // =========================
-  $out = '';
-  $out .= function_exists('acme_ui_panel_css') ? acme_ui_panel_css() : '';
+  $output = '';
+  $output .= function_exists('acme_ui_panel_css') ? acme_ui_panel_css() : '';
+  $output .= '<style>
+    .acme-clt-filter-grid{
+      display:grid;
+      grid-template-columns:repeat(auto-fit, minmax(170px, 1fr));
+      gap:12px;
+      padding:14px 16px 16px;
+    }
+    .acme-clt-filter-grid .acme-field{
+      margin:0;
+      min-width:0;
+    }
+    .acme-clt-filter-grid .acme-field-user{
+      grid-column:span 2;
+    }
+    .acme-clt-filter-grid .acme-input{
+      width:100%;
+    }
+    @media (max-width: 900px){
+      .acme-clt-filter-grid .acme-field-user{
+        grid-column:span 1;
+      }
+    }
+  </style>';
 
-  $base_url = get_permalink();
-  $clear_url = esc_url($base_url);
+  $baseUrl = get_permalink();
+  $clearUrl = esc_url($baseUrl);
 
-  $out .= '<div class="acme-panel">';
-  $out .= '<div class="acme-panel-h">';
-  $out .= '<div>';
-  $out .= '<div class="acme-panel-title">Histórico de Consultas CLT</div>';
-  $out .= '<div class="acme-panel-sub">Mostrando ' . (int)min($total, ($offset + 1)) . '–' . (int)min($total, ($offset + count($rows))) . ' de ' . (int)$total . ' registros.</div>';
-  $out .= '</div>';
-  $out .= '<div class="acme-actions">';
-  $out .= '<a class="acme-btn" href="' . esc_url(add_query_arg([], $base_url)) . '">Atualizar</a>';
-  $out .= '<a class="acme-btn" href="' . $clear_url . '">Limpar filtros</a>';
-  $out .= do_shortcode('[acme_clt_panel_export label="Baixar Relatório" class="acme-btn"]');
-  $out .= '<button class="acme-btn-icon" type="submit" form="acme-clt-filter-form" aria-label="Pesquisar">';
-  $out .= '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true">'
+  $output .= '<div class="acme-panel">';
+  $output .= '<div class="acme-panel-h">';
+  $output .= '<div>';
+  $output .= '<div class="acme-panel-title">Histórico de Consultas CLT</div>';
+  $output .= '<div class="acme-panel-sub">Mostrando ' . (int) min($totalRows, ($offset + 1)) . '–' . (int) min($totalRows, ($offset + count($rows))) . ' de ' . (int) $totalRows . ' registros.</div>';
+  $output .= '</div>';
+  $output .= '<div class="acme-actions">';
+  $output .= '<a class="acme-btn" href="' . esc_url(add_query_arg([], $baseUrl)) . '">Atualizar</a>';
+  $output .= '<a class="acme-btn" href="' . $clearUrl . '">Limpar filtros</a>';
+  $output .= do_shortcode('[acme_clt_panel_export label="Baixar Relatório" class="acme-btn"]');
+  $output .= '<button class="acme-btn-icon" type="submit" form="acme-clt-filter-form" aria-label="Pesquisar">';
+  $output .= '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true">'
     . '<path d="M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z" stroke="currentColor" stroke-width="2" />'
     . '<path d="M16.5 16.5 21 21" stroke="currentColor" stroke-width="2" stroke-linecap="round" />'
     . '</svg>';
-  $out .= '</button>';
-  $out .= '</div>';
-  $out .= '</div>';
+  $output .= '</button>';
+  $output .= '</div>';
+  $output .= '</div>';
 
-  // ===== Filtros (GET) =====
-  // ===== Filtros (GET) =====
-  $out .= '<div class="acme-panel-filters">';
-  $out .= '<form id="acme-clt-filter-form" method="get" action="' . esc_url($base_url) . '" class="acme-filter-grid">'; //$out .= '<form method="get" action="' . esc_url($base_url) . '" class="acme-filter-grid">';
+  $output .= '<div class="acme-panel-filters">';
+  $output .= '<form id="acme-clt-filter-form" method="get" action="' . esc_url($baseUrl) . '" class="acme-clt-filter-grid">';
 
-  // Quando filtra, sempre volta para a página 1
-  $out .= '<input type="hidden" name="clt_page" value="1" />';
+  $output .= '<input type="hidden" name="clt_page" value="1" />';
 
-  // Linha única: 5 campos + botão (igual print)
-  $out .= '<div class="acme-filter-row-6">';
+  if ($canFilterUser) {
+    $output .= '<div class="acme-field acme-field-user">';
+    $output .= '<label class="acme-muted">Usuário / Nome</label>';
+    $output .= '<input class="acme-input" type="text" name="clt_user" value="' . esc_attr($filterUser) . '" placeholder="ID, nome ou email" />';
+    $output .= '</div>';
+  }
 
-  $out .= '<div class="acme-field">';
-  $out .= '<label class="acme-muted">Status</label>';
-  $out .= '<select class="acme-input" name="clt_status">';
-  $out .= '<option value="">Todos</option>';
-  /*foreach ($allowed_status as $st) {
-    $out .= '<option value="' . esc_attr($st) . '"' . selected($f_status, $st, false) . '>' . esc_html($st) . '</option>';
-  }*/
-  $status_labels = [
+  $output .= '<div class="acme-field">';
+  $output .= '<label class="acme-muted">Status</label>';
+  $output .= '<select class="acme-input" name="clt_status">';
+  $output .= '<option value="">Todos</option>';
+
+  $statusLabels = [
     'pending'   => 'Pendente',
     'completed' => 'Completo',
     'failed'    => 'Falha',
   ];
 
-  foreach ($allowed_status as $st) {
-    $label = $status_labels[$st] ?? $st;
-    $out .= '<option value="' . esc_attr($st) . '"' . selected($f_status, $st, false) . '>' . esc_html($label) . '</option>';
+  foreach ($allowedStatus as $statusKey) {
+    $statusLabel = $statusLabels[$statusKey] ?? $statusKey;
+    $output .= '<option value="' . esc_attr($statusKey) . '"' . selected($filterStatus, $statusKey, false) . '>' . esc_html($statusLabel) . '</option>';
   }
-  $out .= '</select>';
-  $out .= '</div>';
 
-  $out .= '<div class="acme-field">';
-  $out .= '<label class="acme-muted">Elegibilidade</label>';
-  $out .= '<select class="acme-input" name="clt_elegibilidade">';
-  $out .= '<option value="">Todos</option>';
-  $out .= '<option value="Elegivel"' . selected($f_elegibilidade, 'Elegivel', false) . '>Elegível</option>';
-  $out .= '<option value="NaoElegivel"' . selected($f_elegibilidade, 'NaoElegivel', false) . '>Não Elegível</option>';
-  $out .= '</select>';
-  $out .= '</div>';
+  $output .= '</select>';
+  $output .= '</div>';
 
-  $out .= '<div class="acme-field">';
-  $out .= '<label class="acme-muted">CPF</label>';
-  $out .= '<input class="acme-input" type="text" name="clt_cpf" value="' . esc_attr($f_cpf_raw) . '" placeholder="ex.: 94132038653 ou 941.***" />';
-  $out .= '</div>';
+  $output .= '<div class="acme-field">';
+  $output .= '<label class="acme-muted">Elegibilidade</label>';
+  $output .= '<select class="acme-input" name="clt_elegibilidade">';
+  $output .= '<option value="">Todos</option>';
+  $output .= '<option value="Elegivel"' . selected($filterElegibilidade, 'Elegivel', false) . '>Elegível</option>';
+  $output .= '<option value="NaoElegivel"' . selected($filterElegibilidade, 'NaoElegivel', false) . '>Não Elegível</option>';
+  $output .= '</select>';
+  $output .= '</div>';
 
-  $out .= '<div class="acme-field">';
-  $out .= '<label class="acme-muted">Data (de)</label>';
-  $out .= '<input class="acme-input" type="date" name="clt_date_from" value="' . esc_attr($f_date_from) . '" />';
-  $out .= '</div>';
+  $output .= '<div class="acme-field">';
+  $output .= '<label class="acme-muted">CPF</label>';
+  $output .= '<input class="acme-input" type="text" name="clt_cpf" value="' . esc_attr($filterCpfRaw) . '" placeholder="ex.: 94132038653 ou 941.***" />';
+  $output .= '</div>';
 
-  $out .= '<div class="acme-field">';
-  $out .= '<label class="acme-muted">Data (até)</label>';
-  $out .= '<input class="acme-input" type="date" name="clt_date_to" value="' . esc_attr($f_date_to) . '" />';
-  $out .= '</div>';
+  $output .= '<div class="acme-field">';
+  $output .= '<label class="acme-muted">Data (de)</label>';
+  $output .= '<input class="acme-input" type="date" name="clt_date_from" value="' . esc_attr($filterDateFrom) . '" />';
+  $output .= '</div>';
 
+  $output .= '<div class="acme-field">';
+  $output .= '<label class="acme-muted">Data (até)</label>';
+  $output .= '<input class="acme-input" type="date" name="clt_date_to" value="' . esc_attr($filterDateTo) . '" />';
+  $output .= '</div>';
 
-  $out .= '</form>';
-  $out .= '</div>'; // panel-filters
-  $out .= '<br>';
+  $output .= '</form>';
+  $output .= '</div>';
+  $output .= '<br>';
+
   if (empty($rows)) {
-    $out .= '<div style="padding:14px 16px;color:#64748b;">Nenhuma consulta encontrada com esses filtros.</div>';
-    $out .= '</div>';
-    return $out;
+    $output .= '<div style="padding:14px 16px;color:#64748b;">Nenhuma consulta encontrada com esses filtros.</div>';
+    $output .= '</div>';
+    return $output;
   }
 
-  // ===== Tabela =====
-  //$out .= '<table class="acme-table" style="font-size:13px">';
-  $out .= '<div style="overflow-x:auto;width:100%;">';
-  $out .= '<table class="acme-table" style="font-size:13px;min-width:900px;white-space:nowrap;">';
-  $out .= '<thead><tr>
+  $output .= '<div style="overflow-x:auto;width:100%;">';
+  $output .= '<table class="acme-table" style="font-size:13px;min-width:900px;white-space:nowrap;">';
+  $output .= '<thead><tr>
     <th>Criado</th>
     <th>Usuário</th>
     <th>CPF</th>
@@ -1883,95 +1936,89 @@ add_shortcode('acme_clt_panel', function () {
     <th>Status</th>
     <th>Situação (Se erro)</th>
     <th>Observação</th>
-
     <th>Ações</th>
   </tr></thead><tbody>';
 
-  foreach ($rows as $r) {
-    $status = $r['status'] ?? 'pending';
+  foreach ($rows as $row) {
+    $status = $row['status'] ?? 'pending';
 
-    $created = $r['created_at'] ?? '';
-    $created = $created ? date_i18n('d/m/Y H:i', strtotime($created)) : '';
+    $createdAt = $row['created_at'] ?? '';
+    $createdAt = $createdAt ? date_i18n('d/m/Y H:i', strtotime($createdAt)) : '';
 
     $badgeClass = 'acme-badge-pending';
-    if ($status === 'completed') $badgeClass = 'acme-badge-completed';
-    if ($status === 'failed') $badgeClass = 'acme-badge-failed';
+    if ($status === 'completed') {
+      $badgeClass = 'acme-badge-completed';
+    }
+    if ($status === 'failed') {
+      $badgeClass = 'acme-badge-failed';
+    }
 
-    $user_name = $r['display_name'] ?? ('#' . (int)$r['user_id']);
-    $cpf = $r['cpf_masked'] ?? '***';
+    $userName = $row['display_name'] ?? ('#' . (int) $row['user_id']);
+    $cpfMasked = $row['cpf_masked'] ?? '***';
 
+    $elegibilidade = '';
 
-    $elegibilidade = "";
-
-    if ($r['status'] != 'pending') {
-
-      if (($r['error_code'] ?? '') === 'nao_elegivel') {
-
-        $elegibilidade = "Não Elegível";
-      } else if (($r['status'] ?? '') === 'failed') {
-
-        $elegibilidade = "-";
-      } else if (($r['status'] ?? '') === 'completed' && empty($r['response_json'])) {
-
-        $elegibilidade = "Não Elegível";
+    if (($row['status'] ?? '') !== 'pending') {
+      if (($row['error_code'] ?? '') === 'nao_elegivel') {
+        $elegibilidade = 'Não Elegível';
+      } elseif (($row['status'] ?? '') === 'failed') {
+        $elegibilidade = '-';
+      } elseif (($row['status'] ?? '') === 'completed' && empty($row['response_json'])) {
+        $elegibilidade = 'Não Elegível';
       } else {
-
-        $elegibilidade = "Elegível";
+        $elegibilidade = 'Elegível';
       }
     }
 
-
-    $observacao = $r['status'] == "completed" &&  $elegibilidade == "Não Elegível" ? $r['error_message'] : '';
-
+    $observacao = (($row['status'] ?? '') === 'completed' && $elegibilidade === 'Não Elegível')
+      ? ($row['error_message'] ?? '')
+      : '';
 
     $actionsCell = '—';
 
-    $requestId = $r['request_id'] ?? '';
-    $responseJson = $r['response_json'] ?? '';
+    $requestId = $row['request_id'] ?? '';
+    $responseJson = $row['response_json'] ?? '';
 
     if (!empty($requestId) && !empty($responseJson) && $status === 'completed') {
       $pdfUrl = add_query_arg([
-        'action' => 'acme_clt_pdf_request',
-        '_wpnonce' => $nonce_pdf,
+        'action'     => 'acme_clt_pdf_request',
+        '_wpnonce'   => $noncePdf,
         'request_id' => $requestId,
       ], admin_url('admin-ajax.php'));
 
-      $viewBtn = '<button type="button" class="acme-btn acme-clt-view-btn" data-request-id="'
+      $viewButton = '<button type="button" class="acme-btn acme-clt-view-btn" data-request-id="'
         . esc_attr($requestId)
         . '">Visualizar</button>';
 
-      $pdfBtn = '<a class="acme-btn" target="_blank" rel="noopener" href="'
+      $pdfButton = '<a class="acme-btn" target="_blank" rel="noopener" href="'
         . esc_url($pdfUrl)
         . '">Baixar PDF</a>';
 
-      $actionsCell = '<div class="acme-clt-actions">'
-        . $viewBtn
-        . $pdfBtn
-        . '</div>';
+      $actionsCell = '<div class="acme-clt-actions">' . $viewButton . $pdfButton . '</div>';
     }
 
-    $error = ($status === 'failed') ? "Houve um erro no processamento da consulta. \nRevise os dados, aguarde alguns instantes e tente novamente. Se o problema persistir, entre em contato com o administrador." : ''; //$error = $r['error_message'] ?? '';
+    $errorMessage = ($status === 'failed')
+      ? "Houve um erro no processamento da consulta. \nRevise os dados, aguarde alguns instantes e tente novamente. Se o problema persistir, entre em contato com o administrador."
+      : '';
 
-    $status_valor = ($status === 'completed') ? 'Completo' : (($status === 'failed') ? 'Falha' : 'Pendente');
+    $statusLabel = ($status === 'completed') ? 'Completo' : (($status === 'failed') ? 'Falha' : 'Pendente');
 
-    $out .= '<tr>';
-    $out .= '<td class="acme-muted">' . esc_html($created) . '</td>';
-    //$out .= '<td><strong>' . esc_html($user_name) . '</strong><br><span class="acme-muted">#' . (int)$r['user_id'] . '</span></td>';
-    $out .= '<td><strong>' . esc_html($user_name) . '</strong></td>';
-    $out .= '<td>' . esc_html($cpf) . '</td>';
-    $out .= '<td class="acme-muted">' . esc_html($elegibilidade) . '</td>';
-    $out .= '<td><span class="acme-badge ' . esc_attr($badgeClass) . '">' . esc_html($status_valor) . '</span></td>';
-    $out .= '<td class="acme-col-error">' . esc_html($error) . '</td>'; //$out .= '<td>' . esc_html($error) . '</td>';
-    $out .= '<td class="acme-col-error">' . $observacao . '</td>'; //$out .= '<td>' . esc_html($error) . '</td>';
-
-    $out .= '<td>' . $actionsCell . '</td>';
-    $out .= '</tr>';
+    $output .= '<tr>';
+    $output .= '<td class="acme-muted">' . esc_html($createdAt) . '</td>';
+    $output .= '<td><strong>' . esc_html($userName) . '</strong></td>';
+    $output .= '<td>' . esc_html($cpfMasked) . '</td>';
+    $output .= '<td class="acme-muted">' . esc_html($elegibilidade) . '</td>';
+    $output .= '<td><span class="acme-badge ' . esc_attr($badgeClass) . '">' . esc_html($statusLabel) . '</span></td>';
+    $output .= '<td class="acme-col-error">' . esc_html($errorMessage) . '</td>';
+    $output .= '<td class="acme-col-error">' . esc_html($observacao) . '</td>';
+    $output .= '<td>' . $actionsCell . '</td>';
+    $output .= '</tr>';
   }
 
-  $out .= '</tbody></table>';
-  $out .= '</div>';
+  $output .= '</tbody></table>';
+  $output .= '</div>';
 
-  $out .= '
+  $output .= '
 <div id="acme-clt-panel-modal" class="acme-clt-modal" hidden>
   <div class="acme-clt-modal__backdrop" data-acme-clt-close="1"></div>
 
@@ -1986,50 +2033,50 @@ add_shortcode('acme_clt_panel', function () {
     </div>
   </div>
 </div>';
+
   // =========================
   // 6) CONTROLES DE PAGINAÇÃO
   // =========================
-  if ($total_pages > 1) {
+  if ($totalPages > 1) {
+    $baseArgs = $_GET;
+    unset($baseArgs['clt_page']);
 
-    $base_args = $_GET;
-    unset($base_args['clt_page']);
-
-    $mk = function ($p) use ($base_url, $base_args) {
-      $args = $base_args;
-      $args['clt_page'] = $p;
-      return esc_url(add_query_arg($args, $base_url));
+    $buildPageUrl = function ($targetPage) use ($baseUrl, $baseArgs) {
+      $args = $baseArgs;
+      $args['clt_page'] = $targetPage;
+      return esc_url(add_query_arg($args, $baseUrl));
     };
 
-    $prev = max(1, $page - 1);
-    $next = min($total_pages, $page + 1);
+    $prevPage = max(1, $page - 1);
+    $nextPage = min($totalPages, $page + 1);
 
-    $out .= '<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-top:1px solid #eef2f7;">';
-    $out .= '<div class="acme-muted">Página <strong>' . (int)$page . '</strong> de <strong>' . (int)$total_pages . '</strong></div>';
-    $out .= '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">';
+    $output .= '<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-top:1px solid #eef2f7;">';
+    $output .= '<div class="acme-muted">Página <strong>' . (int) $page . '</strong> de <strong>' . (int) $totalPages . '</strong></div>';
+    $output .= '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">';
 
     if ($page > 1) {
-      $out .= '<a class="acme-btn" href="' . $mk(1) . '">« Primeira</a>';
-      $out .= '<a class="acme-btn" href="' . $mk($prev) . '">‹ Anterior</a>';
+      $output .= '<a class="acme-btn" href="' . $buildPageUrl(1) . '">« Primeira</a>';
+      $output .= '<a class="acme-btn" href="' . $buildPageUrl($prevPage) . '">‹ Anterior</a>';
     } else {
-      $out .= '<span class="acme-btn" style="opacity:.5;pointer-events:none;">« Primeira</span>';
-      $out .= '<span class="acme-btn" style="opacity:.5;pointer-events:none;">‹ Anterior</span>';
+      $output .= '<span class="acme-btn" style="opacity:.5;pointer-events:none;">« Primeira</span>';
+      $output .= '<span class="acme-btn" style="opacity:.5;pointer-events:none;">‹ Anterior</span>';
     }
 
-    if ($page < $total_pages) {
-      $out .= '<a class="acme-btn" href="' . $mk($next) . '">Próxima ›</a>';
-      $out .= '<a class="acme-btn" href="' . $mk($total_pages) . '">Última »</a>';
+    if ($page < $totalPages) {
+      $output .= '<a class="acme-btn" href="' . $buildPageUrl($nextPage) . '">Próxima ›</a>';
+      $output .= '<a class="acme-btn" href="' . $buildPageUrl($totalPages) . '">Última »</a>';
     } else {
-      $out .= '<span class="acme-btn" style="opacity:.5;pointer-events:none;">Próxima ›</span>';
-      $out .= '<span class="acme-btn" style="opacity:.5;pointer-events:none;">Última »</span>';
+      $output .= '<span class="acme-btn" style="opacity:.5;pointer-events:none;">Próxima ›</span>';
+      $output .= '<span class="acme-btn" style="opacity:.5;pointer-events:none;">Última »</span>';
     }
 
-    $out .= '</div>';
-    $out .= '</div>';
+    $output .= '</div>';
+    $output .= '</div>';
   }
 
-  $out .= '</div>';
+  $output .= '</div>';
 
-  return $out;
+  return $output;
 });
 
 
