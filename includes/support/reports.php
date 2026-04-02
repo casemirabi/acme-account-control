@@ -89,7 +89,8 @@ add_filter('acme_export_registry', function ($r) {
     'columns' => [
       'created_at' => 'Data',
       'user' => 'Usuário',
-      'movement' => 'Movimentação',
+      'movement' => 'Serviço',
+      'description' => 'Descrição',
       'delta' => 'Saldo',
     ],
 
@@ -97,7 +98,8 @@ add_filter('acme_export_registry', function ($r) {
     'pdf_columns' => [
       'Data',
       'Usuário',
-      'Movimentação',
+      'Serviço',
+      'Descrição',
       'Saldo'
     ],
 
@@ -189,7 +191,8 @@ add_filter('acme_export_registry', function ($r) {
       return [
         $dt_fmt,
         $user . ' #' . $uid,
-        ucwords(str_replace(['_', '-'], ' ', (string) ($row['service_label'] ?? ''))),  // (string)($row['service_label'] ?? ''),
+        ucwords(str_replace(['_', '-'], ' ', (string) ($row['service_label'] ?? ''))),
+        (string) ($row['notes'] ?? ''),
         (string) $delta,
       ];
     },
@@ -208,9 +211,10 @@ add_filter('acme_export_registry', function ($r) {
 
       return [
         $dt_fmt,
-        $user . ' #' . $uid,                 // Histórico (igual sua tabela mostra usuário + id)
-        (string) ($row['service_label'] ?? ''), // Movimentação = serviço
-        (string) $delta,                      // Saldo = delta (-1, +5, etc)
+        $user . ' #' . $uid,
+        (string) ($row['service_label'] ?? ''),
+        (string) ($row['notes'] ?? ''),
+        (string) $delta,
       ];
     },
   ];

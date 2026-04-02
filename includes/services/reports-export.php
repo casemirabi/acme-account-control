@@ -210,31 +210,30 @@ function acme_pdf_text($x, $y, $text, $size = 10, $rgb = [0, 0, 0]): string
  */
 function acme_output_extrato_pdf_pretty(array $rows, string $cliente, string $filename = 'extrato.pdf'): void
 {
-
   // A4 portrait (pt)
   $pageW = 595;
   $pageH = 842;
-  $m = 48;
+  $m = 30;
 
   $usableW = $pageW - $m * 2;
 
-  // Colunas (ajuste fino aqui)
-  $wData = 150;
-  $wHist = 215;
-  $wMov = 130;
-  $wSaldo = $usableW - ($wData + $wHist + $wMov);
-  $wSaldo = max(80, $wSaldo); // mínimo
+  // Colunas
+  $wData  = 78;
+  $wUser  = 150;
+  $wServ  = 90;
+  $wDesc  = 135;
+  $wSaldo = $usableW - ($wData + $wUser + $wServ + $wDesc);
+  $wSaldo = max(60, $wSaldo);
 
-  // se estourar, tira do histórico
-  $sumW = $wData + $wHist + $wMov + $wSaldo;
+  // Ajuste defensivo se estourar
+  $sumW = $wData + $wUser + $wServ + $wDesc + $wSaldo;
   if ($sumW > $usableW) {
     $diff = $sumW - $usableW;
-    $wHist = max(120, $wHist - $diff);
+    $wDesc = max(90, $wDesc - $diff);
   }
 
-  $rowH = 28;           // altura da linha
-  $headerH = 30;        // altura do cabeçalho
-  $radiusFake = 0;      // (PDF nativo sem curva fácil — deixamos retinho)
+  $rowH = 28;
+  $headerH = 30;
 
   // Cores
   $bgTable = [1, 1, 1];
@@ -260,115 +259,108 @@ function acme_output_extrato_pdf_pretty(array $rows, string $cliente, string $fi
   $gerado = date_i18n('d/m/Y H:i', current_time('timestamp'));
   $content .= acme_pdf_text($m, $y, "Gerado em: " . $gerado, 10, $muted);
 
-  // Tabela container
-  $y -= 34;
-
+  // Tabela
+  $y -= 25;
   $tableX = $m;
-  $tableYTop = $y; // topo da tabela (linha do header vai começar aqui)
-
-  // altura total (header + rows)
+  $tableYTop = $y;
   $tableH = $headerH + (count($rows) * $rowH);
 
-  // fundo e borda
   $content .= acme_pdf_rect_fill($tableX, $tableYTop - $tableH, $usableW, $tableH, acme_pdf_color_fill(...$bgTable));
   $content .= acme_pdf_rect_stroke($tableX, $tableYTop - $tableH, $usableW, $tableH, $border, 1);
 
-
-  // linhas verticais (colunas)
+  // Divisões verticais
   $x1 = $tableX + $wData;
-  $x2 = $tableX + $wData + $wHist;
-  $x3 = $tableX + $wData + $wHist + $wMov;
+  $x2 = $x1 + $wUser;
+  $x3 = $x2 + $wServ;
+  $x4 = $x3 + $wDesc;
 
   $content .= "q\n" . acme_pdf_color_stroke(...$border) . "1 w\n";
-  foreach ([$x1, $x2, $x3] as $xx) {
+  foreach ([$x1, $x2, $x3, $x4] as $xx) {
     $content .= acme_pdf_num($xx) . ' ' . acme_pdf_num($tableYTop) . " m " .
       acme_pdf_num($xx) . ' ' . acme_pdf_num($tableYTop - $tableH) . " l S\n";
   }
   $content .= "Q\n";
 
-
-  // header bg
+  // Header
   $content .= acme_pdf_rect_fill($tableX, $tableYTop - $headerH, $usableW, $headerH, acme_pdf_color_fill(...$headBg));
 
-  // header text (centralizado verticalmente)
   $padX = 8;
   $hyText = $tableYTop - 20;
 
   $content .= acme_pdf_text($tableX + $padX, $hyText, "Data", 8, $titleColor);
-  $content .= acme_pdf_text($tableX + $wData + $padX, $hyText, "Usuário", 8, $titleColor);
-  $content .= acme_pdf_text($tableX + $wData + $wHist + $padX, $hyText, "Serviço", 8, $titleColor);
-  $content .= acme_pdf_text($tableX + $wData + $wHist + $wMov + $padX, $hyText, "Saldo", 8, $titleColor);
+  $content .= acme_pdf_text($x1 + $padX, $hyText, "Usuário", 8, $titleColor);
+  $content .= acme_pdf_text($x2 + $padX, $hyText, "Serviço", 8, $titleColor);
+  $content .= acme_pdf_text($x3 + $padX, $hyText, "Descrição", 8, $titleColor);
+  $content .= acme_pdf_text($x4 + $padX, $hyText, "Saldo", 8, $titleColor);
 
-  // linha divisória header
   $content .= "q\n" . acme_pdf_color_stroke(...$border) . "1 w\n" .
     acme_pdf_num($tableX) . ' ' . acme_pdf_num($tableYTop - $headerH) . " m " .
     acme_pdf_num($tableX + $usableW) . ' ' . acme_pdf_num($tableYTop - $headerH) . " l S\nQ\n";
 
-  // Função simples para truncar texto
   $fit = function (string $text, int $maxChars): string {
     $text = trim($text);
-    if (mb_strlen($text) <= $maxChars)
+    if (mb_strlen($text) <= $maxChars) {
       return $text;
+    }
     return mb_substr($text, 0, max(0, $maxChars - 1)) . '…';
   };
 
-  // Rows
   $rowYTop = $tableYTop - $headerH;
   for ($i = 0; $i < count($rows); $i++) {
     $r = $rows[$i];
     $ry = $rowYTop - ($i * $rowH);
 
-    // zebra
     if ($i % 2 === 1) {
       $content .= acme_pdf_rect_fill($tableX, $ry - $rowH, $usableW, $rowH, acme_pdf_color_fill(...$zebraBg));
     }
 
-    // linha inferior
     $content .= "q\n" . acme_pdf_color_stroke(...$border) . "1 w\n" .
       acme_pdf_num($tableX) . ' ' . acme_pdf_num($ry - $rowH) . " m " .
       acme_pdf_num($tableX + $usableW) . ' ' . acme_pdf_num($ry - $rowH) . " l S\nQ\n";
 
-    // texto (alinhamento)
     $ty = $ry - 10;
 
     $data = (string) ($r[0] ?? '');
-    $hist = (string) ($r[1] ?? '');
-    $mov = (string) ($r[2] ?? '');
-    $saldo = (string) ($r[3] ?? '');
+    $user = (string) ($r[1] ?? '');
+    $serv = (string) ($r[2] ?? '');
+    $desc = (string) ($r[3] ?? '');
+    $saldo = (string) ($r[4] ?? '');
 
     $content .= acme_pdf_text($tableX + $padX, $ty, $fit($data, 18), 8, $titleColor);
-    $content .= acme_pdf_text($tableX + $wData + $padX, $ty, $fit($hist, 26), 8, $titleColor);
-    $content .= acme_pdf_text($tableX + $wData + $wHist + $padX, $ty, $fit($mov, 14), 8, $titleColor);
+    $content .= acme_pdf_text($x1 + $padX, $ty, $fit($user, 26), 8, $titleColor);
+    $content .= acme_pdf_text($x2 + $padX, $ty, $fit($serv, 14), 8, $titleColor);
+    $content .= acme_pdf_text($x3 + $padX, $ty, $fit($desc, 24), 8, $titleColor);
 
-    // saldo colorido
     $saldoNum = (int) preg_replace('/[^\-\d]/', '', $saldo);
     $saldoColor = ($saldoNum < 0) ? $red : $green;
 
-    // deixa com sinal + quando positivo (igual print)
     $saldoTxt = (string) $saldo;
-    if ($saldoNum > 0 && strpos($saldoTxt, '+') !== 0)
+    if ($saldoNum > 0 && strpos($saldoTxt, '+') !== 0) {
       $saldoTxt = '+' . $saldoNum;
-    if ($saldoNum === 0)
+    }
+    if ($saldoNum === 0) {
       $saldoTxt = '0';
+    }
 
-    $content .= acme_pdf_text($tableX + $wData + $wHist + $wMov + $padX, $ty, $saldoTxt, 8, $saldoColor);
+    $content .= acme_pdf_text($x4 + $padX, $ty, $saldoTxt, 8, $saldoColor);
+
+    $content .= acme_pdf_text($x4 + $padX, $ty, $saldoTxt, 8, $saldoColor);
   }
 
-  // Monta PDF (mínimo)
   $objects = [];
   $addObj = function (string $s) use (&$objects): int {
     $objects[] = $s;
     return count($objects);
   };
 
-  $addObj("<< /Type /Catalog /Pages 2 0 R >>"); // 1
-  $addObj("<< /Type /Pages /Kids [3 0 R] /Count 1 >>"); // 2
+  $addObj("<< /Type /Catalog /Pages 2 0 R >>");
+  $addObj("<< /Type /Pages /Kids [3 0 R] /Count 1 >>");
   $addObj("<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {$pageW} {$pageH}]
-              /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>"); // 3
-  $addObj("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>"); // 4
+              /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>");
+  $addObj("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>");
 
   $stream = $content;
-  $addObj("<< /Length " . strlen($stream) . " >>\nstream\n{$stream}\nendstream"); // 5
+  $addObj("<< /Length " . strlen($stream) . " >>\nstream\n{$stream}\nendstream");
 
   $pdf = "%PDF-1.4\n";
   $offsets = [0];
@@ -396,7 +388,6 @@ function acme_output_extrato_pdf_pretty(array $rows, string $cliente, string $fi
   echo $pdf;
   exit;
 }
-
 
 /**
  * Gera PDF simples com tabela (1 página).
@@ -627,8 +618,6 @@ add_action('admin_post_acme_export', function () {
 
     $filename = 'extrato_' . date('Y-m-d') . '.pdf';
     acme_output_extrato_pdf_pretty($pdfRows, $cliente, $filename);
-
-
   }
 
   // ============================================================
