@@ -595,13 +595,13 @@ add_filter('acme_export_registry', function ($r) {
   // ============================================================
   $r['clt_history'] = [
     'columns' => [
-      'identificador' => 'Identificação',
-      'status' => 'Status',
+      'created_at' => 'Criado',
       'user' => 'Usuário',
       'cpf' => 'CPF',
-      'created_at' => 'Criado em',
-      'completed_at' => 'Concluído em',
-      'error' => 'Erro',
+      'elegibilidade' => 'Elegibilidade',
+      'status' => 'Status',
+      'error' => 'Situação (Se erro)',
+      'observacao' => 'Observação',
     ],
 
     // Mantém o mesmo nome dos GET da tela:
@@ -745,35 +745,52 @@ add_filter('acme_export_registry', function ($r) {
     },
 
     'map_row' => function ($row) {
-      $request_id = (string) ($row['request_id'] ?? '');
-      $ident = $request_id ? str_replace('clt_', '', $request_id) : '';
-
       $status = (string) ($row['status'] ?? '');
 
       $uid = (int) ($row['user_id'] ?? 0);
       $name = (string) ($row['display_name'] ?? '');
-      $user = $name ? ($name . ' #' . $uid) : ('#' . $uid);
+      $user = $name ? $name : ('#' . $uid);
 
       $cpf = (string) ($row['cpf_masked'] ?? '');
 
       $created = (string) ($row['created_at'] ?? '');
       $created_fmt = $created ? date_i18n('d/m/Y H:i', strtotime($created)) : '';
 
-      $completed = (string) ($row['completed_at'] ?? '');
-      $completed_fmt = $completed ? date_i18n('d/m/Y H:i', strtotime($completed)) : '';
+      $elegibilidade = '';
 
-      $err = trim((string) ($row['error_code'] ?? ''));
-      $msg = trim((string) ($row['error_message'] ?? ''));
-      $error = $err || $msg ? ($err . ($err && $msg ? ' | ' : '') . $msg) : '';
+      if ($status !== 'pending') {
+        if (($row['error_code'] ?? '') === 'nao_elegivel') {
+          $elegibilidade = 'Não Elegível';
+        } elseif ($status === 'failed') {
+          $elegibilidade = '-';
+        } elseif ($status === 'completed' && empty($row['response_json'])) {
+          $elegibilidade = 'Não Elegível';
+        } else {
+          $elegibilidade = 'Elegível';
+        }
+      }
+
+      $observacao = (
+        $status === 'completed' &&
+        $elegibilidade === 'Não Elegível'
+      ) ? (string) ($row['error_message'] ?? '') : '';
+
+      $error = ($status === 'failed')
+        ? 'Houve um erro no processamento da consulta. Revise os dados, aguarde alguns instantes e tente novamente. Se o problema persistir, entre em contato com o administrador.'
+        : '';
+
+      $status_label = $status === 'completed'
+        ? 'Completo'
+        : ($status === 'failed' ? 'Falha' : 'Pendente');
 
       return [
-        $ident,
-        $status,
+        $created_fmt,
         $user,
         $cpf,
-        $created_fmt,
-        $completed_fmt,
+        $elegibilidade,
+        $status_label,
         $error,
+        $observacao,
       ];
     },
   ];

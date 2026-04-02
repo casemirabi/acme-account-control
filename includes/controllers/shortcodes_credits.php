@@ -1882,6 +1882,8 @@ add_shortcode('acme_clt_panel', function () {
     <th>Elegibilidade</th>
     <th>Status</th>
     <th>Situação (Se erro)</th>
+    <th>Observação</th>
+
     <th>Ações</th>
   </tr></thead><tbody>';
 
@@ -1898,16 +1900,29 @@ add_shortcode('acme_clt_panel', function () {
     $user_name = $r['display_name'] ?? ('#' . (int)$r['user_id']);
     $cpf = $r['cpf_masked'] ?? '***';
 
+
     $elegibilidade = "";
+
     if ($r['status'] != 'pending') {
+
       if (($r['error_code'] ?? '') === 'nao_elegivel') {
+
         $elegibilidade = "Não Elegível";
-      } else if (($r['status'] ?? '') === 'completed' && ($r['response_json'] ?? '') === "") {
+      } else if (($r['status'] ?? '') === 'failed') {
+
+        $elegibilidade = "-";
+      } else if (($r['status'] ?? '') === 'completed' && empty($r['response_json'])) {
+
         $elegibilidade = "Não Elegível";
       } else {
+
         $elegibilidade = "Elegível";
       }
     }
+
+
+    $observacao = $r['status'] == "completed" &&  $elegibilidade == "Não Elegível" ? $r['error_message'] : '';
+
 
     $actionsCell = '—';
 
@@ -1947,6 +1962,8 @@ add_shortcode('acme_clt_panel', function () {
     $out .= '<td class="acme-muted">' . esc_html($elegibilidade) . '</td>';
     $out .= '<td><span class="acme-badge ' . esc_attr($badgeClass) . '">' . esc_html($status_valor) . '</span></td>';
     $out .= '<td class="acme-col-error">' . esc_html($error) . '</td>'; //$out .= '<td>' . esc_html($error) . '</td>';
+    $out .= '<td class="acme-col-error">' . $observacao . '</td>'; //$out .= '<td>' . esc_html($error) . '</td>';
+
     $out .= '<td>' . $actionsCell . '</td>';
     $out .= '</tr>';
   }
@@ -3521,7 +3538,7 @@ function acme_shortcode_inss_form()
   if (function_exists('acme_enqueue_inss_assets')) {
     acme_enqueue_inss_assets();
   }
-  
+
   ob_start();
 ?>
   <div class="acme-card acme-inss-shell">
