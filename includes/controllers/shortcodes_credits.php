@@ -2311,134 +2311,120 @@ add_shortcode('acme_recover_credits_form', function () {
 #==============================================================
 
 if (!function_exists('acme_render_credit_table_html')) {
-  if (!function_exists('acme_render_credit_table_html')) {
-    function acme_render_credit_table_html(array $detailRows, array $serviceTotals, bool $showTotals): string
-    {
-      $detailCount = count($detailRows);
+  function acme_render_credit_table_html(array $detailRows, array $serviceTotals, bool $showTotals): string
+  {
+    $detailCount = count($detailRows);
+    $isAdmin = current_user_can('manage_options');
 
-      ob_start();
-  ?>
-      <div class="acme-panel acme-tx-panel">
-        <div class="acme-panel-h">
-          <div>
-            <div class="acme-panel-title">Créditos Disponíveis</div>
-            <div class="acme-panel-sub">
-              Consulta de créditos por usuário, serviço e validade conforme seu escopo de acesso.
-            </div>
-          </div>
-
-          <div class="acme-actions">
-            <a class="acme-btn" href="<?php echo esc_url(add_query_arg([], get_permalink())); ?>">
-              Atualizar
-            </a>
+    ob_start();
+?>
+    <div class="acme-panel acme-tx-panel acme-credit-panel">
+      <div class="acme-panel-h acme-credit-panel__header">
+        <div class="acme-credit-panel__headline">
+          <div class="acme-panel-title">Créditos Disponíveis</div>
+          <div class="acme-panel-sub">
+            Consulta de créditos por usuário, serviço e validade conforme seu escopo de acesso.
           </div>
         </div>
 
-        <div class="acme-panel-body">
-          <p class="acme-muted acme-total">
-            Total encontrado: <strong><?php echo (int) $detailCount; ?></strong>
-          </p>
+        <div class="acme-actions">
+          <a class="acme-btn acme-btn--primary" href="<?php echo esc_url(add_query_arg([], get_permalink())); ?>">
+            Atualizar
+          </a>
         </div>
+      </div>
 
+      <div class="acme-panel-body acme-credit-panel__body">
+        <div class="acme-credit-summary">
+          <div class="acme-credit-summary__card">
+            <span class="acme-credit-summary__label">Total encontrado</span>
+            <strong class="acme-credit-summary__value"><?php echo (int) $detailCount; ?></strong>
+          </div>
+
+          <div class="acme-credit-summary__card">
+            <span class="acme-credit-summary__label">Serviços com saldo</span>
+            <strong class="acme-credit-summary__value"><?php echo (int) count($serviceTotals); ?></strong>
+          </div>
+        </div>
+      </div>
+
+      <?php if ($isAdmin): ?>
         <?php
-        $isAdmin = current_user_can('manage_options');
-        ?>
+        $balanceCacheKey = 'acme_inss_balance_cache';
+        $balanceData = get_transient($balanceCacheKey);
 
-        <?php if ($isAdmin): ?>
+        if (!is_array($balanceData)) {
+          $saldo = null;
+          $erro = null;
 
-          <?php
-          $balanceCacheKey = 'acme_inss_balance_cache';
+          $endpoint = 'https://novaeraapp.b-cdn.net/v1/consultav2/94de3edb-7082-4810-9727-4dbe243b8fff/saldo';
 
-          $balanceData = get_transient($balanceCacheKey);
+          $response = wp_remote_get($endpoint, [
+            'timeout'   => 10,
+            'sslverify' => true,
+            'headers'   => [
+              'Accept' => 'application/json',
+            ],
+          ]);
 
-          if (!is_array($balanceData)) {
+          if (is_wp_error($response)) {
+            $erro = $response->get_error_message();
+          } else {
+            $code = wp_remote_retrieve_response_code($response);
+            $body = wp_remote_retrieve_body($response);
 
-            $saldo = null;
-            $erro = null;
+            if ($code === 200 && $body) {
+              $json = json_decode($body, true);
 
-            $endpoint = 'https://novaeraapp.b-cdn.net/v1/consultav2/94de3edb-7082-4810-9727-4dbe243b8fff/saldo';
-
-            $response = wp_remote_get($endpoint, [
-              'timeout' => 10,
-              'sslverify' => true,
-              'headers' => [
-                'Accept' => 'application/json',
-              ],
-            ]);
-
-            if (is_wp_error($response)) {
-
-              $erro = $response->get_error_message();
-            } else {
-
-              $code = wp_remote_retrieve_response_code($response);
-              $body = wp_remote_retrieve_body($response);
-
-              if ($code === 200 && $body) {
-
-                $json = json_decode($body, true);
-
-                if (isset($json['saldo'])) {
-
-                  $saldo = (int) $json['saldo'];
-                } else {
-
-                  $erro = 'JSON inválido';
-                }
+              if (isset($json['saldo'])) {
+                $saldo = (int) $json['saldo'];
               } else {
-
-                $erro = 'HTTP ' . $code;
+                $erro = 'JSON inválido';
               }
+            } else {
+              $erro = 'HTTP ' . $code;
             }
-
-            $balanceData = [
-              'saldo' => $saldo,
-              'erro' => $erro,
-              'time' => current_time('timestamp'),
-            ];
-
-            set_transient($balanceCacheKey, $balanceData, 60);
           }
 
-          ?>
+          $balanceData = [
+            'saldo' => $saldo,
+            'erro'  => $erro,
+            'time'  => current_time('timestamp'),
+          ];
 
-          <div class="acme-panel-body" style="padding-top:0;">
+          set_transient($balanceCacheKey, $balanceData, 60);
+        }
+        ?>
 
-            <?php if (!empty($balanceData['erro'])): ?>
+        <div class="acme-panel-body acme-credit-panel__body acme-credit-panel__body--compact">
+          <div class="acme-credit-balance <?php echo !empty($balanceData['erro']) ? 'is-error' : 'is-ok'; ?>">
+            <span class="acme-credit-balance__label">Saldo INSS fornecedor</span>
+            <strong class="acme-credit-balance__value">
+              <?php echo !empty($balanceData['erro']) ? 'Indisponível' : (int) $balanceData['saldo']; ?>
+            </strong>
+          </div>
+        </div>
+      <?php endif; ?>
 
-              <p class="acme-muted">
-                Saldo INSS fornecedor:
-                <strong style="color:#b91c1c;">indisponível</strong>
-              </p>
-
-            <?php else: ?>
-
-              <p class="acme-muted">
-                Saldo INSS fornecedor:
-                <strong><?php echo (int) $balanceData['saldo']; ?></strong>
-              </p>
-
-
-            <?php endif; ?>
-
+      <?php if ($showTotals): ?>
+        <div class="acme-panel-body acme-credit-panel__body acme-credit-panel__section">
+          <div class="acme-credit-section-head">
+            <h3 class="acme-credit-section-title">Totais por serviço</h3>
           </div>
 
-        <?php endif; ?>
-
-        <?php if ($showTotals): ?>
-          <div class="acme-table-wrap" style="margin-bottom:18px;">
-            <table class="acme-table">
+          <div class="acme-table-wrap acme-credit-table-wrap">
+            <table class="acme-table acme-credit-table acme-credit-table--totals">
               <thead>
                 <tr>
                   <th>Serviço</th>
                   <th>Slug</th>
-                  <th style="text-align:center;">Total disponível</th>
+                  <th class="is-center">Total disponível</th>
                 </tr>
               </thead>
               <tbody>
                 <?php if (empty($serviceTotals)): ?>
                   <tr>
-                    <td colspan="3" class="acme-muted" style="text-align:center;">
+                    <td colspan="3" class="acme-muted is-center">
                       Nenhum total por serviço disponível.
                     </td>
                   </tr>
@@ -2451,7 +2437,7 @@ if (!function_exists('acme_render_credit_table_html')) {
                       <td class="acme-mono">
                         <?php echo esc_html($totalRow['service_slug'] ?? '—'); ?>
                       </td>
-                      <td style="text-align:center;font-weight:900;">
+                      <td class="is-center acme-credit-number">
                         <?php echo (int) ($totalRow['total_available'] ?? 0); ?>
                       </td>
                     </tr>
@@ -2460,74 +2446,82 @@ if (!function_exists('acme_render_credit_table_html')) {
               </tbody>
             </table>
           </div>
-        <?php endif; ?>
+        </div>
+      <?php endif; ?>
 
-        <?php if (empty($detailRows)): ?>
-          <div class="acme-empty">Nenhum crédito disponível no escopo atual.</div>
-      </div>
-    <?php
-          return ob_get_clean();
-        endif;
-    ?>
-
-    <div class="acme-table-wrap">
-      <table class="acme-table">
-        <thead>
-          <tr>
-            <th>Usuário</th>
-            <th>Serviço</th>
-            <th style="text-align:center;">Créditos</th>
-            <th>Validade</th>
-          </tr>
-        </thead>
-        <tbody>
-          <?php foreach ($detailRows as $row): ?>
-            <tr>
-              <td>
-                <strong><?php echo esc_html($row['display_name'] ?? '—'); ?></strong><br>
-                <span class="acme-muted">
-                  <?php echo esc_html($row['user_email'] ?? '—'); ?>
-                </span>
-              </td>
-
-              <td>
-                <strong><?php echo esc_html($row['service_name'] ?? '—'); ?></strong><br>
-                <span class="acme-muted">
-                  <?php echo esc_html($row['service_slug'] ?? ''); ?>
-                </span>
-              </td>
-
-              <td style="text-align:center;font-weight:900;">
-                <?php echo (int) ($row['available_credits'] ?? 0); ?>
-              </td>
-
-              <td class="acme-mono">
-                <?php
-                $expiresAt = isset($row['expires_at']) ? (string) $row['expires_at'] : '';
-
-                if (empty($expiresAt)) {
-                  echo 'Sem validade';
-                } else {
-                  $date = substr($expiresAt, 0, 10);
-                  $time = substr($expiresAt, 11, 8);
-                  $parts = explode('-', $date);
-
-                  echo (count($parts) === 3)
-                    ? esc_html($parts[2] . '/' . $parts[1] . '/' . $parts[0] . ' ' . $time)
-                    : esc_html($expiresAt);
-                }
-                ?>
-              </td>
-            </tr>
-          <?php endforeach; ?>
-        </tbody>
-      </table>
+      <?php if (empty($detailRows)): ?>
+        <div class="acme-empty">Nenhum crédito disponível no escopo atual.</div>
     </div>
+<?php
+        return ob_get_clean();
+      endif;
+?>
+
+      <div class="acme-panel-body acme-credit-panel__body acme-credit-panel__section">
+        <div class="acme-credit-section-head">
+          <h3 class="acme-credit-section-title">Detalhamento</h3>
+        </div>
+
+        <div class="acme-table-wrap acme-credit-table-wrap">
+          <table class="acme-table acme-credit-table acme-credit-table--details">
+            <thead>
+              <tr>
+                <th>Usuário</th>
+                <th>Serviço</th>
+                <th class="is-center">Créditos</th>
+                <th>Validade</th>
+              </tr>
+            </thead>
+            <tbody>
+              <?php foreach ($detailRows as $row): ?>
+                <tr>
+                  <td>
+                    <strong class="acme-credit-user-name">
+                      <?php echo esc_html($row['display_name'] ?? '—'); ?>
+                    </strong>
+                    <span class="acme-credit-user-email">
+                      <?php echo esc_html($row['user_email'] ?? '—'); ?>
+                    </span>
+                  </td>
+
+                  <td>
+                    <strong><?php echo esc_html($row['service_name'] ?? '—'); ?></strong>
+                    <span class="acme-credit-service-slug">
+                      <?php echo esc_html($row['service_slug'] ?? ''); ?>
+                    </span>
+                  </td>
+
+                  <td class="is-center acme-credit-number">
+                    <?php echo (int) ($row['available_credits'] ?? 0); ?>
+                  </td>
+
+                  <td class="acme-mono">
+                    <?php
+                    $expiresAt = isset($row['expires_at']) ? (string) $row['expires_at'] : '';
+
+                    if (empty($expiresAt)) {
+                      echo 'Sem validade';
+                    } else {
+                      $date = substr($expiresAt, 0, 10);
+                      $time = substr($expiresAt, 11, 8);
+                      $parts = explode('-', $date);
+
+                      echo (count($parts) === 3)
+                        ? esc_html($parts[2] . '/' . $parts[1] . '/' . $parts[0] . ' ' . $time)
+                        : esc_html($expiresAt);
+                    }
+                    ?>
+                  </td>
+                </tr>
+              <?php endforeach; ?>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
 <?php
 
-      return (string) ob_get_clean();
-    }
+    return (string) ob_get_clean();
   }
 }
 

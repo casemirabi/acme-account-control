@@ -518,3 +518,38 @@ add_action('template_redirect', function () {
   }
 
 });
+
+
+### whitelist de serviços públicos permitidos / INSS
+if (!function_exists('acme_api_consumer_allowed_public_services')) {
+  function acme_api_consumer_allowed_public_services(): array
+  {
+    return ['clt', 'inss'];
+  }
+}
+
+if (!function_exists('acme_api_consumer_normalize_allowed_services')) {
+  function acme_api_consumer_normalize_allowed_services($allowedServices): string
+  {
+    $serviceSlugs = is_array($allowedServices) ? $allowedServices : explode(',', (string) $allowedServices);
+    $serviceSlugs = array_map('sanitize_key', $serviceSlugs);
+    $serviceSlugs = array_filter($serviceSlugs, static function ($serviceSlug) {
+      return $serviceSlug !== '';
+    });
+
+    $allowedPublicServices = function_exists('acme_api_consumer_allowed_public_services')
+      ? acme_api_consumer_allowed_public_services()
+      : ['clt'];
+
+    $serviceSlugs = array_values(array_intersect($serviceSlugs, $allowedPublicServices));
+    $serviceSlugs = array_values(array_unique($serviceSlugs));
+
+    if (empty($serviceSlugs)) {
+      $serviceSlugs = ['clt'];
+    }
+
+    sort($serviceSlugs);
+
+    return implode(',', $serviceSlugs);
+  }
+}

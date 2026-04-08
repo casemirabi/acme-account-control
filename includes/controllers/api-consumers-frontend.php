@@ -139,14 +139,11 @@ if (!function_exists('acme_api_control_panel_handle_post')) {
                 ? array_map('sanitize_key', (array) wp_unslash($_POST['allowed_services']))
                 : ['clt'];
 
-            if ($wpUserId <= 0) {
-                acme_api_control_panel_store_notice('error', 'Selecione um usuário válido.');
-                return;
-            }
-
-            if ($consumerName === '') {
-                acme_api_control_panel_store_notice('error', 'Informe o nome da chave.');
-                return;
+            if (function_exists('acme_api_consumer_allowed_public_services')) {
+                $allowedServices = array_values(array_intersect(
+                    $allowedServices,
+                    acme_api_consumer_allowed_public_services()
+                ));
             }
 
             if (empty($allowedServices)) {

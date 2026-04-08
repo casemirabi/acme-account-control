@@ -167,6 +167,11 @@ if (!empty($lastUsedValues)) {
                                 <input type="checkbox" name="allowed_services[]" value="clt" checked>
                                 clt
                             </label>
+
+                            <label class="acme-api-service-item">
+                                <input type="checkbox" name="allowed_services[]" value="inss">
+                                inss
+                            </label>
                         </div>
                     </div>
 
@@ -235,6 +240,7 @@ if (!empty($lastUsedValues)) {
                             <select id="acme-filter-service" name="filter_service">
                                 <option value="">Todos</option>
                                 <option value="clt" <?php selected($filterService, 'clt'); ?>>clt</option>
+                                <option value="inss" <?php selected($filterService, 'inss'); ?>>inss</option>
                             </select>
                         </div>
 

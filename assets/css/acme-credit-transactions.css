@@ -194,3 +194,221 @@
   color:#fff;
   border-color:#111827;
 }
+
+/* ==========================================================
+   Créditos disponíveis — refinamento visual
+   Reaproveita painel/tabela base do ACME
+   ========================================================== */
+
+.acme-credit-panel{
+  border-radius: 18px;
+  box-shadow: 0 10px 28px rgba(15, 23, 42, .06);
+}
+
+.acme-credit-panel__header{
+  padding: 20px 22px;
+  align-items: flex-start;
+}
+
+.acme-credit-panel__headline{
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.acme-credit-panel .acme-panel-title{
+  font-size: 28px;
+  line-height: 1.15;
+  letter-spacing: -.02em;
+}
+
+.acme-credit-panel .acme-panel-sub{
+  font-size: 15px;
+  max-width: 760px;
+}
+
+.acme-credit-panel__body{
+  padding: 18px 22px;
+}
+
+.acme-credit-panel__body--compact{
+  padding-top: 0;
+}
+
+.acme-credit-panel__section{
+  padding-top: 0;
+}
+
+.acme-btn--primary{
+  background: #f8fbff;
+  border-color: #cbd5e1;
+  color: #0f3b82;
+  min-width: 120px;
+  text-align: center;
+}
+
+.acme-btn--primary:hover{
+  background: #eef4ff;
+  border-color: #94a3b8;
+}
+
+.acme-credit-summary{
+  display: grid;
+  grid-template-columns: repeat(2, minmax(180px, 220px));
+  gap: 12px;
+}
+
+.acme-credit-summary__card{
+  background: linear-gradient(180deg, #f8fbff 0%, #f1f5f9 100%);
+  border: 1px solid #dbe6f2;
+  border-radius: 16px;
+  padding: 14px 16px;
+}
+
+.acme-credit-summary__label{
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  color: #64748b;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+.acme-credit-summary__value{
+  display: block;
+  font-size: 28px;
+  line-height: 1;
+  font-weight: 900;
+  color: #0f172a;
+}
+
+.acme-credit-balance{
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid #dbe6f2;
+  background: #f8fbff;
+  margin-top: 15px;
+}
+
+.acme-credit-balance.is-error{
+  background: #fff7f7;
+  border-color: #fecaca;
+}
+
+.acme-credit-balance__label{
+  
+  font-size: 13px;
+  font-weight: 700;
+  color: #64748b;
+}
+
+.acme-credit-balance__value{
+  font-size: 22px;
+  font-weight: 900;
+  color: #0f3b82;
+}
+
+.acme-credit-balance.is-error .acme-credit-balance__value{
+  color: #b91c1c;
+}
+
+.acme-credit-section-head{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  margin-top: 10px;
+}
+
+.acme-credit-section-title{
+  margin: 0;
+  font-size: 15px;
+  font-weight: 900;
+  color: #0f172a;
+}
+
+.acme-credit-table-wrap{
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  overflow: auto;
+  background: #fff;
+}
+
+.acme-credit-table{
+  font-size: 14px;
+}
+
+.acme-credit-table th{
+  background: #f8fafc;
+  color: #0f172a;
+  font-size: 13px;
+  text-transform: none;
+  border-top: 0;
+}
+
+.acme-credit-table td{
+  padding-top: 14px;
+  padding-bottom: 14px;
+}
+
+.acme-credit-table tbody tr:hover td{
+  background: #fbfdff;
+}
+
+.acme-credit-table--details tbody tr + tr td{
+  border-top: 1px solid #edf2f7;
+}
+
+.acme-credit-user-name{
+  display: block;
+  font-size: 15px;
+  font-weight: 800;
+  color: #0f172a;
+  margin-bottom: 4px;
+}
+
+.acme-credit-user-email,
+.acme-credit-service-slug{
+  display: block;
+  color: #64748b;
+  font-size: 13px;
+  margin-top: 4px;
+}
+
+.acme-credit-number{
+  font-size: 22px;
+  font-weight: 900;
+  color: #0f172a;
+}
+
+.is-center{
+  text-align: center !important;
+}
+
+@media (max-width: 768px){
+  .acme-credit-panel__header{
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .acme-credit-summary{
+    grid-template-columns: 1fr;
+  }
+
+  .acme-credit-panel .acme-panel-title{
+    font-size: 24px;
+  }
+
+  .acme-credit-panel .acme-panel-sub{
+    font-size: 14px;
+  }
+
+  .acme-credit-number{
+    font-size: 18px;
+  }
+}

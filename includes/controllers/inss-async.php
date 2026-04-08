@@ -52,16 +52,15 @@ add_action('rest_api_init', function () {
         return true;
       }
 
-      $apiKey = (string) $req->get_header('x-acme-key');
+      $apiKey = function_exists('acme_get_api_key_from_request')
+        ? acme_get_api_key_from_request($req)
+        : (string) $req->get_header('x-acme-key');
+
       if ($apiKey !== '' && function_exists('acme_validate_api_key')) {
         $consumerData = acme_validate_api_key($apiKey, 'inss');
 
         if (!is_wp_error($consumerData)) {
-          $apiUserId = (int) ($consumerData['wp_user_id'] ?? 0);
-
-          if ($apiUserId > 0 && user_can($apiUserId, 'manage_options')) {
-            return true;
-          }
+          return true;
         }
       }
 
@@ -90,16 +89,15 @@ add_action('rest_api_init', function () {
         return true;
       }
 
-      $apiKey = (string) $req->get_header('x-acme-key');
+      $apiKey = function_exists('acme_get_api_key_from_request')
+        ? acme_get_api_key_from_request($req)
+        : (string) $req->get_header('x-acme-key');
+
       if ($apiKey !== '' && function_exists('acme_validate_api_key')) {
         $consumerData = acme_validate_api_key($apiKey, 'inss');
 
         if (!is_wp_error($consumerData)) {
-          $apiUserId = (int) ($consumerData['wp_user_id'] ?? 0);
-
-          if ($apiUserId > 0 && user_can($apiUserId, 'manage_options')) {
-            return true;
-          }
+          return true;
         }
       }
 
@@ -326,12 +324,14 @@ if (!function_exists('acme_resolve_authenticated_user_id')) {
       return $userId;
     }
 
-    $apiKey = (string) $req->get_header('x-acme-key');
+    $apiKey = function_exists('acme_get_api_key_from_request')
+      ? acme_get_api_key_from_request($req)
+      : (string) $req->get_header('x-acme-key');
     if ($apiKey !== '' && function_exists('acme_validate_api_key')) {
       $consumerData = acme_validate_api_key($apiKey, 'inss');
 
       if (!is_wp_error($consumerData)) {
-        return (int) ($consumerData['wp_user_id'] ?? 0);
+        return true;
       }
     }
 
@@ -362,7 +362,23 @@ function acme_api_inss_start(WP_REST_Request $req)
   $userId = (int) get_current_user_id();
 
   if ($userId <= 0) {
-    $userId = acme_resolve_authenticated_user_id($req);
+    $authContext = function_exists('acme_resolve_authenticated_user_context')
+      ? acme_resolve_authenticated_user_context($req)
+      : acme_resolve_authenticated_user_id($req);
+
+    if (is_wp_error($authContext)) {
+      return acme_err(
+        (int) ($authContext->get_error_data()['status'] ?? 401),
+        $authContext->get_error_message(),
+        strtoupper((string) $authContext->get_error_code())
+      );
+    }
+
+    if (is_array($authContext)) {
+      $userId = (int) ($authContext['user_id'] ?? 0);
+    } else {
+      $userId = (int) $authContext;
+    }
   }
 
   if ($userId <= 0) {
@@ -787,4 +803,58 @@ function acme_inss_real_dispatch_handler(
   );
 
   error_log('[ACME INSS] completed ' . $requestId);
+}
+
+
+if (!function_exists('acme_resolve_authenticated_user_context')) {
+  function acme_resolve_authenticated_user_context(WP_REST_Request $req)
+  {
+    $currentUserId = (int) get_current_user_id();
+    if ($currentUserId > 0) {
+      return [
+        'user_id' => $currentUserId,
+        'source'  => 'session',
+      ];
+    }
+
+    $apiKey = function_exists('acme_get_api_key_from_request')
+      ? acme_get_api_key_from_request($req)
+      : (string) $req->get_header('x-acme-key');
+
+    if ($apiKey === '') {
+      return new WP_Error(
+        'acme_api_key_required',
+        'A chave da API é obrigatória.',
+        ['status' => 401]
+      );
+    }
+
+    if (!function_exists('acme_validate_api_key')) {
+      return new WP_Error(
+        'acme_api_key_validator_missing',
+        'Validador da API pública indisponível.',
+        ['status' => 500]
+      );
+    }
+
+    $consumerData = acme_validate_api_key($apiKey, 'inss');
+    if (is_wp_error($consumerData)) {
+      return $consumerData;
+    }
+
+    $resolvedUserId = (int) ($consumerData['wp_user_id'] ?? 0);
+    if ($resolvedUserId <= 0) {
+      return new WP_Error(
+        'acme_api_key_user_invalid',
+        'Usuário vinculado à chave é inválido.',
+        ['status' => 401]
+      );
+    }
+
+    return [
+      'user_id' => $resolvedUserId,
+      'source'  => 'api_key',
+      'consumer' => $consumerData,
+    ];
+  }
 }
