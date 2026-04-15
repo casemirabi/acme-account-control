@@ -207,30 +207,30 @@ if (!function_exists('acme_api_consumer_get_all')) {
     // Filtro por usuário
     // =========================
     if (!empty($filters['user_id'])) {
-        $whereParts[] = 'wp_user_id = %d';
-        $params[]     = (int) $filters['user_id'];
+      $whereParts[] = 'wp_user_id = %d';
+      $params[]     = (int) $filters['user_id'];
     }
 
     // =========================
     // Filtro por status
     // =========================
     if (!empty($filters['status'])) {
-        $whereParts[] = 'status = %s';
-        $params[]     = sanitize_text_field($filters['status']);
+      $whereParts[] = 'status = %s';
+      $params[]     = sanitize_text_field($filters['status']);
     }
 
     // =========================
     // Filtro por serviço
     // =========================
     if (!empty($filters['service'])) {
-        $whereParts[] = 'allowed_services LIKE %s';
-        $params[]     = '%' . $wpdb->esc_like($filters['service']) . '%';
+      $whereParts[] = 'allowed_services LIKE %s';
+      $params[]     = '%' . $wpdb->esc_like($filters['service']) . '%';
     }
 
     $whereSql = '';
 
     if (!empty($whereParts)) {
-        $whereSql = 'WHERE ' . implode(' AND ', $whereParts);
+      $whereSql = 'WHERE ' . implode(' AND ', $whereParts);
     }
 
     $sql = "SELECT * FROM {$tableName}
@@ -464,11 +464,9 @@ if (!function_exists('acme_user_has_active_service')) {
     $rows = $wpdb->get_results(
       $wpdb->prepare(
         "SELECT * FROM {$tableName}
-         WHERE wp_user_id = %d
-         AND status = 'active'
-         LIMIT 1
-         "
-         ,
+     WHERE wp_user_id = %d
+     AND status = 'active'
+     ",
         $wpUserId
       ),
       ARRAY_A
@@ -490,7 +488,21 @@ if (!function_exists('acme_user_has_active_service')) {
 
 add_action('template_redirect', function () {
 
-  if (!is_page('api-clt')) {
+  $pageServiceMap = [
+    'api-clt'  => 'clt',
+    'api-inss' => 'inss',
+  ];
+
+  $requiredServiceSlug = null;
+
+  foreach ($pageServiceMap as $pageSlug => $serviceSlug) {
+    if (is_page($pageSlug)) {
+      $requiredServiceSlug = $serviceSlug;
+      break;
+    }
+  }
+
+  if ($requiredServiceSlug === null) {
     return;
   }
 
@@ -499,7 +511,6 @@ add_action('template_redirect', function () {
     return;
   }
 
-  // 🔒 NOVA REGRA: API global bloqueada
   if (function_exists('acme_api_public_is_enabled') && !acme_api_public_is_enabled()) {
     wp_safe_redirect(home_url('/sem-permissao/'));
     exit;
@@ -512,11 +523,10 @@ add_action('template_redirect', function () {
 
   $userId = get_current_user_id();
 
-  if (!acme_user_has_active_service($userId, 'clt')) {
+  if (!acme_user_has_active_service($userId, $requiredServiceSlug)) {
     wp_safe_redirect(home_url('/sem-permissao/'));
     exit;
   }
-
 });
 
 
