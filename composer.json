@@ -1,0 +1,23 @@
+{
+  "name": "acme/account-control",
+  "description": "ACME Account Control WordPress plugin with simplified MVC bootstrap.",
+  "type": "wordpress-plugin",
+  "autoload": {
+    "psr-4": {
+      "Acme\\AccountControl\\": "app/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "Acme\\AccountControl\\Tests\\": "tests/"
+    }
+  },
+  "require": {
+    "php": ">=7.4"
+  },
+  "require-dev": {},
+  "scripts": {
+    "test:syntax": "find . -path ./lib -prune -o -path ./vendor -prune -o -name '*.php' -print0 | xargs -0 -n1 php -l",
+    "test:regression": "php tests/Regression/PluginStructureTest.php"
+  }
+}
