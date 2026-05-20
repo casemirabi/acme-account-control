@@ -49,8 +49,6 @@ require_once __DIR__ . '/app/Hooks/UserHooks.php';
 require_once __DIR__ . '/app/Hooks/AdminHooks.php';
 require_once __DIR__ . '/app/Hooks/FrontendHooks.php';
 require_once __DIR__ . '/app/Hooks/RestApiHooks.php';
-require_once __DIR__ . '/app/Hooks/AjaxHooks.php';
-require_once __DIR__ . '/app/Hooks/CronHooks.php';
 require_once __DIR__ . '/app/Hooks/ReportHooks.php';
 require_once __DIR__ . '/app/Hooks/HookRegistrar.php';
 require_once __DIR__ . '/app/Bootstrap.php';
