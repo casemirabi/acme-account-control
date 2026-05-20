@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Acme\AccountControl;
 
 use Acme\AccountControl\Hooks\ActivationHooks;
-use Acme\AccountControl\Hooks\LegacyHookRegistry;
+use Acme\AccountControl\Hooks\HookRegistrar;
 use Acme\AccountControl\Services\VendorLoader;
 
 /**
@@ -45,7 +45,7 @@ final class Bootstrap
     {
         $this->loadConfiguration();
         $this->loadVendors();
-        $this->registerLegacyHooks();
+        $this->registerHooks();
         $this->registerActivationHooks();
     }
 
@@ -66,12 +66,16 @@ final class Bootstrap
     }
 
     /**
-     * Carrega módulos legados que ainda registram hooks diretamente.
+     * Registra hooks do WordPress por grupos funcionais.
+     *
+     * Esta camada mantém compatibilidade com arquivos legados, mas substitui o
+     * carregamento genérico por uma organização explícita em Admin, Frontend,
+     * REST API, AJAX, Cron, Users, Reports e compatibilidade.
      */
-    private function registerLegacyHooks(): void
+    private function registerHooks(): void
     {
-        $legacyFiles = require $this->pluginPath . 'config/legacy-files.php';
-        (new LegacyHookRegistry($this->pluginPath, $legacyFiles))->register();
+        $hookGroups = require $this->pluginPath . 'config/hook-files.php';
+        (new HookRegistrar($this->pluginPath, $hookGroups))->register();
     }
 
     /**

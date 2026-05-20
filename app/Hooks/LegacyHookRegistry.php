@@ -43,7 +43,7 @@ final class LegacyHookRegistry
     }
 
     /**
-     * Carrega arquivos legados na ordem definida em config/legacy-files.php.
+     * Carrega arquivos legados na ordem recebida pelo grupo funcional atual.
      */
     public function register(): void
     {

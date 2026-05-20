@@ -44,3 +44,33 @@ Executar regressão estrutural:
 ```bash
 composer run test:regression
 ```
+
+## Atualização — Etapa 4: centralização de hooks
+
+Nesta etapa, os hooks passaram a ser inicializados por `app/Hooks/HookRegistrar.php` usando o manifesto agrupado `config/hook-files.php`.
+
+A mudança é conservadora: os arquivos legados continuam existindo e os callbacks públicos antigos continuam disponíveis. O ganho principal é organização e rastreabilidade.
+
+### Novas classes adicionadas
+
+- `CompatibilityHooks`
+- `UserHooks`
+- `AdminHooks`
+- `FrontendHooks`
+- `RestApiHooks`
+- `AjaxHooks`
+- `CronHooks`
+- `ReportHooks`
+- `HookRegistrar`
+
+### Teste novo
+
+Foi adicionado `tests/Regression/HookManifestTest.php`, que garante que o manifesto agrupado carrega os mesmos arquivos do manifesto legado e na mesma ordem.
+
+Execute:
+
+```bash
+composer run test:regression
+composer run test:syntax
+```
+
