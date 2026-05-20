@@ -7,6 +7,7 @@ if (!defined('ABSPATH')) {
 use Acme\AccountControl\Models\CreditRepository;
 use Acme\AccountControl\Services\CreditGrantService;
 use Acme\AccountControl\Services\CreditTransactionService;
+use Acme\AccountControl\Support\CompatibilityLogger;
 
 /**
  * DEPENDE de helpers.php:
@@ -58,13 +59,20 @@ if (!function_exists('acme_service_get_by_slug')) {
   /**
    * Resolve serviço por slug público.
    *
-   * O slug é usado em shortcodes, telas administrativas e integrações. Por isso,
-   * o comportamento foi preservado e apenas a query foi movida para o Model.
+   * @deprecated 3.0.0 Use CreditRepository::findServiceBySlug() instead.
+   *
+   * Compatibilidade:
+   * O slug é usado em shortcodes, telas administrativas e integrações antigas.
+   * Por isso, o comportamento foi preservado e apenas a query foi movida para
+   * o Repository moderno.
    *
    * @return object|null
    */
   function acme_service_get_by_slug(string $slug)
   {
+    do_action('deprecated_function_run', __FUNCTION__, '3.0.0', 'Acme\AccountControl\Models\CreditRepository::findServiceBySlug');
+    CompatibilityLogger::deprecatedFunctionUsed(__FUNCTION__, 'Acme\AccountControl\Models\CreditRepository::findServiceBySlug');
+
     return acme_credit_repository()->findServiceBySlug($slug);
   }
 }
@@ -73,13 +81,19 @@ if (!function_exists('acme_wallet_get')) {
   /**
    * Lê a carteira de créditos de um usuário para determinado serviço.
    *
-   * Mantemos a função global para compatibilidade com módulos de créditos que
-   * ainda não foram migrados para Services.
+   * @deprecated 3.0.0 Use CreditRepository::findWallet() instead.
+   *
+   * Compatibilidade:
+   * Mantemos a função global para compatibilidade com módulos de créditos e
+   * snippets externos que ainda não consomem o Repository diretamente.
    *
    * @return object|null
    */
   function acme_wallet_get(int $user_id, int $service_id)
   {
+    do_action('deprecated_function_run', __FUNCTION__, '3.0.0', 'Acme\AccountControl\Models\CreditRepository::findWallet');
+    CompatibilityLogger::deprecatedFunctionUsed(__FUNCTION__, 'Acme\AccountControl\Models\CreditRepository::findWallet');
+
     return acme_credit_repository()->findWallet($user_id, $service_id);
   }
 }
@@ -88,6 +102,9 @@ if (!function_exists('acme_credits_tx_log')) {
   /**
    * Registra transação de crédito sem depender da carteira.
    *
+   * @deprecated 3.0.0 Use CreditTransactionService::log() instead.
+   *
+   * Compatibilidade:
    * Esta função agora atua como fachada legada. A regra de negócio real vive em
    * `CreditTransactionService`, facilitando manutenção e testes sem alterar o
    * contrato público antigo.
@@ -96,6 +113,9 @@ if (!function_exists('acme_credits_tx_log')) {
    */
   function acme_credits_tx_log(array $data): array
   {
+    do_action('deprecated_function_run', __FUNCTION__, '3.0.0', 'Acme\\AccountControl\\Services\\CreditTransactionService::log');
+    CompatibilityLogger::deprecatedFunctionUsed(__FUNCTION__, 'Acme\\AccountControl\\Services\\CreditTransactionService::log');
+
     $service = new CreditTransactionService(acme_credit_repository());
 
     return $service->log($data);
@@ -105,6 +125,8 @@ if (!function_exists('acme_credits_tx_log')) {
 if (!function_exists('acme_credits_grant')) {
   /**
    * Concede créditos e grava a transação de auditoria.
+   *
+   * @deprecated 3.0.0 Use CreditGrantService::grant() instead.
    *
    * Compatibilidade:
    * A assinatura e o formato de retorno foram mantidos. Internamente, a lógica
@@ -122,6 +144,9 @@ if (!function_exists('acme_credits_grant')) {
     ?string $notes = null,
     ?array $meta = null
   ): array {
+    do_action('deprecated_function_run', __FUNCTION__, '3.0.0', 'Acme\\AccountControl\\Services\\CreditGrantService::grant');
+    CompatibilityLogger::deprecatedFunctionUsed(__FUNCTION__, 'Acme\\AccountControl\\Services\\CreditGrantService::grant');
+
     $grantService = new CreditGrantService(acme_credit_repository());
 
     return $grantService->grant($user_id, $service, $credits_amount, $expires_at, $notes, $meta);
