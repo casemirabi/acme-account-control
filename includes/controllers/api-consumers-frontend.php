@@ -8,74 +8,32 @@ add_shortcode('acme_api_control_panel', 'acme_api_control_panel_shortcode');
 add_action('wp_enqueue_scripts', 'acme_api_control_panel_enqueue_assets');
 
 if (!function_exists('acme_api_control_panel_shortcode')) {
+    /**
+     * Wrapper legado do shortcode público `[acme_api_control_panel]`.
+     *
+     * Compatibilidade:
+     * A função global continua existindo para não quebrar chamadas diretas em
+     * snippets, temas ou integrações. A execução real foi movida para um
+     * Controller MVC, onde validação, assets e renderização ficam organizados.
+     */
     function acme_api_control_panel_shortcode()
     {
-        if (!is_user_logged_in()) {
-            return '<div class="acme-api-panel-message">Faça login para acessar este painel.</div>';
-        }
-
-        if (!current_user_can('manage_options')) {
-            return '<script>window.location.href="' . esc_url(home_url('/sem-permissao/')) . '";</script>';
-        }
-
-        wp_enqueue_style(
-            'acme-api-control-panel',
-            ACME_ACC_URL . 'assets/css/acme-api-panel.css',
-            [],
-            '1.0.1'
-        );
-
-        wp_enqueue_script(
-            'acme-shortcode-layout',
-            ACME_ACC_URL . 'assets/js/acme-shortcode-layout.js',
-            [],
-            '1.0.3',
-            true
-        );
-
-        acme_api_control_panel_handle_post();
-
-        $viewFile = ACME_ACC_PATH . 'includes/views/api-consumers-panel.php';
-        if (!file_exists($viewFile)) {
-            return '<div class="acme-api-panel-message">View do painel não encontrada.</div>';
-        }
-
-        ob_start();
-        include $viewFile;
-        return ob_get_clean();
+        return (new \Acme\AccountControl\Controllers\Frontend\ApiControlPanelController(ACME_ACC_PATH))->shortcode();
     }
 }
 
 if (!function_exists('acme_api_control_panel_enqueue_assets')) {
+    /**
+     * Wrapper legado do enqueue do painel da API.
+     *
+     * Mantemos o nome da função porque ela está registrada em `wp_enqueue_scripts`
+     * e pode ser referenciada fora do plugin. O Controller decide quando os
+     * assets realmente devem ser carregados.
+     */
     function acme_api_control_panel_enqueue_assets()
     {
-        if (!is_user_logged_in() || !current_user_can('manage_options')) {
-            return;
-        }
-
-        global $post;
-
-        if (!$post instanceof WP_Post) {
-            return;
-        }
-
-        if (!has_shortcode($post->post_content, 'acme_api_control_panel')) {
-            return;
-        }
-
-        wp_enqueue_style(
-            'acme-api-control-panel',
-            ACME_ACC_URL . 'assets/css/acme-api-panel.css',
-            [],
-            '1.0.1'
-        );
-        wp_enqueue_script(
-            'acme-shortcode-layout',
-            ACME_ACC_URL . 'assets/js/acme-shortcode-layout.js',
-            [],
-            '1.0.2',
-            true
-        );
+        (new \Acme\AccountControl\Controllers\Frontend\ApiControlPanelController(ACME_ACC_PATH))
+            ->enqueueAssetsWhenShortcodeIsPresent();
     }
 }
 

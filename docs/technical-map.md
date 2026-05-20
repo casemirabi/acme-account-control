@@ -175,3 +175,20 @@ Funções legadas
 
 Ainda existem queries espalhadas em arquivos de shortcodes, relatórios e integrações assíncronas.
 A migração deve continuar por domínio, priorizando baixo risco e testes de regressão.
+
+
+## Etapa 7 — Controllers e Views
+
+A primeira extração de Controllers/Views foi aplicada no painel público de controle da API.
+
+- `app/Views/View.php` centraliza renderização de templates novos e legados.
+- `app/Controllers/Frontend/ApiControlPanelController.php` passou a controlar o shortcode `[acme_api_control_panel]`.
+- `app/Controllers/Admin/AdminPageController.php` prepara validações comuns de wp-admin.
+- `app/Controllers/Admin/ApiConsumersAdminController.php` prepara a migração segura dos callbacks administrativos de chaves da API.
+
+Compatibilidade preservada:
+
+- wrappers globais continuam existindo;
+- shortcodes não foram renomeados;
+- templates legados continuam disponíveis;
+- hooks públicos não foram removidos.

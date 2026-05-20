@@ -29,6 +29,11 @@ if (!defined('ACME_PLUGIN_FILE')) {
 
 require_once __DIR__ . '/app/Helpers/SafeRequire.php';
 require_once __DIR__ . '/app/Services/VendorLoader.php';
+require_once __DIR__ . '/app/Security/RequestGuard.php';
+require_once __DIR__ . '/app/Views/View.php';
+require_once __DIR__ . '/app/Controllers/Admin/AdminPageController.php';
+require_once __DIR__ . '/app/Controllers/Admin/ApiConsumersAdminController.php';
+require_once __DIR__ . '/app/Controllers/Frontend/ApiControlPanelController.php';
 require_once __DIR__ . '/app/Models/ServiceRepository.php';
 require_once __DIR__ . '/app/Models/WalletRepository.php';
 require_once __DIR__ . '/app/Models/CreditTransactionRepository.php';
