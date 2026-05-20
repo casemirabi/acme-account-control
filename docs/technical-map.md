@@ -87,3 +87,45 @@ Este mapa foi gerado antes/depois da primeira etapa de refatoração segura para
 ## Cron
 
 - Nenhuma ocorrência encontrada.
+
+## Etapa 5 - Migração inicial de regras de negócio para Services
+
+Nesta etapa, o fluxo de créditos começou a sair do arquivo legado `includes/services/credits-engine.php` e foi separado em classes MVC simples:
+
+- `app/Models/CreditRepository.php`
+  - concentra queries de serviços, carteiras e transações;
+  - preserva as mesmas tabelas legadas resolvidas por `acme_table_services()`, `acme_table_wallet()` e `acme_table_credit_transactions()`;
+  - mantém transações SQL manuais (`START TRANSACTION`, `COMMIT`, `ROLLBACK`) porque o fluxo original já dependia desse comportamento.
+
+- `app/Services/CreditTransactionService.php`
+  - contém a regra de registro de transações de crédito;
+  - preserva preenchimento automático de `service_slug` e `service_name`;
+  - mantém o mesmo formato de retorno usado por `acme_credits_tx_log()`.
+
+- `app/Services/CreditGrantService.php`
+  - contém a regra de concessão de créditos;
+  - atualiza/cria wallet;
+  - registra auditoria na tabela de transações;
+  - executa rollback em falhas para preservar consistência de saldo.
+
+### Compatibilidade preservada
+
+As funções públicas abaixo continuam existindo no arquivo legado e agora atuam como wrappers:
+
+- `acme_debug_db_error()`
+- `acme_service_get_by_slug()`
+- `acme_wallet_get()`
+- `acme_credits_tx_log()`
+- `acme_credits_grant()`
+
+Isso evita quebra em shortcodes, telas administrativas, callbacks `admin_post`, integrações e qualquer código externo que chame essas funções diretamente.
+
+### Próximo alvo recomendado
+
+Migrar gradualmente os fluxos de distribuição e transferência de créditos:
+
+- `includes/services/credits-distribution.php`
+- `includes/services/credits-transfer.php`
+- `includes/controllers/credits-frontend.php`
+
+Esses arquivos dependem do motor de créditos e devem ser movidos somente depois de validar concessão e auditoria em ambiente WordPress real.

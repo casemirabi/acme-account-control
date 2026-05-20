@@ -1,6 +1,6 @@
 {
   "name": "acme/account-control",
-  "description": "ACME Account Control WordPress plugin with simplified MVC bootstrap.",
+  "description": "ACME Account Control WordPress plugin with simplified MVC bootstrap, hook registry, and initial service extraction.",
   "type": "wordpress-plugin",
   "autoload": {
     "psr-4": {
@@ -18,6 +18,6 @@
   "require-dev": {},
   "scripts": {
     "test:syntax": "find . -path ./lib -prune -o -path ./vendor -prune -o -name '*.php' -print0 | xargs -0 -n1 php -l",
-    "test:regression": "php tests/Regression/PluginStructureTest.php && php tests/Regression/HookManifestTest.php"
+    "test:regression": "php tests/Regression/PluginStructureTest.php && php tests/Regression/HookManifestTest.php && php tests/Regression/ServiceExtractionTest.php"
   }
 }
