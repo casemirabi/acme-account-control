@@ -30,6 +30,7 @@ if (!defined('ACME_PLUGIN_FILE')) {
 require_once __DIR__ . '/app/Helpers/SafeRequire.php';
 require_once __DIR__ . '/app/Services/VendorLoader.php';
 require_once __DIR__ . '/app/Security/RequestGuard.php';
+require_once __DIR__ . '/app/Support/CompatibilityLogger.php';
 require_once __DIR__ . '/app/Views/View.php';
 require_once __DIR__ . '/app/Controllers/Admin/AdminPageController.php';
 require_once __DIR__ . '/app/Controllers/Admin/ApiConsumersAdminController.php';

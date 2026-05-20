@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Acme\AccountControl\Hooks;
 
 use Acme\AccountControl\Helpers\SafeRequire;
+use Acme\AccountControl\Support\CompatibilityLogger;
 
 /**
  * Carrega arquivos de hooks ainda baseados em callbacks globais.
@@ -48,8 +49,14 @@ final class HookFileLoader
     public function register(): void
     {
         foreach ($this->hookFiles as $hookFile) {
+            $relativePath = (string) $hookFile['path'];
+
+            // Log temporário e opcional para descobrir quais arquivos procedurais
+            // ainda são carregados durante a fase final de remoção do legado.
+            CompatibilityLogger::legacyFileLoaded($relativePath);
+
             SafeRequire::file(
-                $this->pluginPath . $hookFile['path'],
+                $this->pluginPath . $relativePath,
                 (bool) $hookFile['required']
             );
         }
