@@ -46,7 +46,7 @@ final class HookRegistrar
      *
      * A sequência abaixo é propositalmente explícita para facilitar manutenção:
      * primeiro carregamos compatibilidade e usuários, depois admin/frontend,
-     * rotas REST, jobs assíncronos e relatórios.
+     * rotas REST e relatórios.
      */
     public function register(): void
     {
@@ -58,8 +58,6 @@ final class HookRegistrar
         (new AdminHooks($this->pluginPath, $this->group('credit_admin')))->register();
         (new RestApiHooks($this->pluginPath, $this->group('external_api')))->register();
         (new RestApiHooks($this->pluginPath, $this->group('rest_api')))->register();
-        (new AjaxHooks($this->pluginPath, $this->group('ajax')))->register();
-        (new CronHooks($this->pluginPath, $this->group('cron')))->register();
         (new ReportHooks($this->pluginPath, $this->group('reports')))->register();
     }
 

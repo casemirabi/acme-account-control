@@ -90,14 +90,6 @@ return [
         ['path' => 'includes/controllers/pbank-async.php', 'required' => false],
     ],
 
-    'ajax' => [
-        // Reservado para a próxima etapa: extrair callbacks wp_ajax_* de helpers.php.
-    ],
-
-    'cron' => [
-        // Reservado para a próxima etapa: extrair callbacks assíncronos de helpers.php e controllers REST.
-    ],
-
     'reports' => [
         // Exportações e relatórios carregados no final para enxergar filtros/serviços já registrados.
         ['path' => 'includes/services/reports-export.php', 'required' => false],
