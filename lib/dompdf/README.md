@@ -1,239 +1,637 @@
-Dompdf
-======
+# PHP CSS Parser
 
-[![Build Status](https://github.com/dompdf/dompdf/actions/workflows/test.yml/badge.svg)](https://github.com/dompdf/dompdf/actions/workflows/test.yml)
-[![PHP Versions Supported](https://poser.pugx.org/dompdf/dompdf/require/php)](https://packagist.org/packages/dompdf/dompdf)
-[![Latest Release](https://poser.pugx.org/dompdf/dompdf/v)](https://packagist.org/packages/dompdf/dompdf)
-[![Total Downloads](https://poser.pugx.org/dompdf/dompdf/downloads)](https://packagist.org/packages/dompdf/dompdf)
-[![License](https://poser.pugx.org/dompdf/dompdf/license)](https://packagist.org/packages/dompdf/dompdf)
- 
-**Dompdf is an HTML to PDF converter**
+[![Build Status](https://github.com/sabberworm/PHP-CSS-Parser/workflows/CI/badge.svg?branch=master)](https://github.com/sabberworm/PHP-CSS-Parser/actions/)
 
-At its heart, dompdf is (mostly) a [CSS 2.1](http://www.w3.org/TR/CSS2/) compliant
-HTML layout and rendering engine written in PHP. It is a style-driven renderer:
-it will download and read external stylesheets, inline style tags, and the style
-attributes of individual HTML elements. It also supports most presentational
-HTML attributes.
+A Parser for CSS Files written in PHP. Allows extraction of CSS files into a data structure, manipulation of said structure and output as (optimized) CSS.
 
-*This document applies to the latest stable code which may not reflect the current 
-release. For released code please
-[navigate to the appropriate tag](https://github.com/dompdf/dompdf/tags).*
+## Usage
 
-----
-
-**Check out the [demo](http://eclecticgeek.com/dompdf/debug.php) and ask any
-question on [StackOverflow](https://stackoverflow.com/questions/tagged/dompdf) or
-in [Discussions](https://github.com/dompdf/dompdf/discussions).**
-
-Follow us on [![Twitter](http://twitter-badges.s3.amazonaws.com/twitter-a.png)](http://www.twitter.com/dompdf).
-
----
-
-
-
-## Features
-
- * Handles most CSS 2.1 and a few CSS3 properties, including @import, @media &
-   @page rules
- * Supports most presentational HTML 4.0 attributes
- * Supports external stylesheets, either local or through http/ftp (via
-   fopen-wrappers)
- * Supports complex tables, including row & column spans, separate & collapsed
-   border models, individual cell styling
- * Image support (gif, png (8, 24 and 32 bit with alpha channel), bmp & jpeg)
- * No dependencies on external PDF libraries, thanks to the R&OS PDF class
- * Inline PHP support
- * Basic SVG support (see "Limitations" below)
- 
-## Requirements
-
- * PHP version 7.1 or higher
- * DOM extension
- * MBString extension
- * php-font-lib
- * php-svg-lib
- 
-Note that some required dependencies may have further dependencies 
-(notably php-svg-lib requires sabberworm/php-css-parser).
-
-### Recommendations
-
- * GD (for image processing)
-   * Additionally, the IMagick or GMagick extension improves image processing performance for certain image types
- * OPcache (OPcache, XCache, APC, etc.): improves performance
-
-Visit the wiki for more information:
-https://github.com/dompdf/dompdf/wiki/Requirements
-
-## About Fonts & Character Encoding
-
-PDF documents internally support the following fonts: Helvetica, Times-Roman,
-Courier, Zapf-Dingbats, & Symbol. These fonts only support Windows ANSI
-encoding. In order for a PDF to display characters that are not available in
-Windows ANSI, you must supply an external font. Dompdf will embed any referenced
-font in the PDF so long as it has been pre-loaded or is accessible to dompdf and
-reference in CSS @font-face rules. See the
-[font overview](https://github.com/dompdf/dompdf/wiki/About-Fonts-and-Character-Encoding)
-for more information on how to use fonts.
-
-The [DejaVu TrueType fonts](https://dejavu-fonts.github.io/) have been pre-installed
-to give dompdf decent Unicode character coverage by default. To use the DejaVu
-fonts reference the font in your stylesheet, e.g. `body { font-family: DejaVu
-Sans; }` (for DejaVu Sans). The following DejaVu 2.34 fonts are available:
-DejaVu Sans, DejaVu Serif, and DejaVu Sans Mono.
-
-## Easy Installation
-
-### Install with composer
-
-To install with [Composer](https://getcomposer.org/), simply require the
-latest version of this package.
+### Installation using Composer
 
 ```bash
-composer require dompdf/dompdf
+composer require sabberworm/php-css-parser
 ```
 
-Make sure that the autoload file from Composer is loaded.
+### Extraction
+
+To use the CSS Parser, create a new instance. The constructor takes the following form:
 
 ```php
-// somewhere early in your project's loading, require the Composer autoloader
-// see: http://getcomposer.org/doc/00-intro.md
-require 'vendor/autoload.php';
+new \Sabberworm\CSS\Parser($css);
 ```
 
-### Download and install
-
-Download a packaged archive of dompdf and extract it into the 
-directory where dompdf will reside
-
- * You can download stable copies of dompdf from
-   https://github.com/dompdf/dompdf/releases
- * Or download a nightly (the latest, unreleased code) from
-   http://eclecticgeek.com/dompdf
-
-Use the packaged release autoloader to load dompdf, libraries,
-and helper functions in your PHP:
+To read a file, for example, you’d do the following:
 
 ```php
-// include autoloader
-require_once 'dompdf/autoload.inc.php';
+$parser = new \Sabberworm\CSS\Parser(file_get_contents('somefile.css'));
+$cssDocument = $parser->parse();
 ```
 
-Note: packaged releases are named according using semantic
-versioning (_dompdf_MAJOR-MINOR-PATCH.zip_). So the 1.0.0 
-release would be dompdf_1-0-0.zip. This is the only download
-that includes the autoloader for Dompdf and all its dependencies.
+The resulting CSS document structure can be manipulated prior to being output.
 
-### Install with git
+### Options
 
-From the command line, switch to the directory where dompdf will
-reside and run the following commands:
+#### Charset
 
-```sh
-git clone https://github.com/dompdf/dompdf.git
-cd dompdf/lib
-
-git clone https://github.com/PhenX/php-font-lib.git php-font-lib
-cd php-font-lib
-git checkout 0.5.1
-cd ..
-
-git clone https://github.com/PhenX/php-svg-lib.git php-svg-lib
-cd php-svg-lib
-git checkout v0.3.2
-cd ..
-
-git clone https://github.com/sabberworm/PHP-CSS-Parser.git php-css-parser
-cd php-css-parser
-git checkout 8.1.0
-```
-
-Require dompdf and it's dependencies in your PHP.
-For details see the [autoloader in the utils project](https://github.com/dompdf/utils/blob/master/autoload.inc.php).
-
-## Framework Integration
-
-* For Symfony: [nucleos/dompdf-bundle](https://github.com/nucleos/NucleosDompdfBundle)
-* For Laravel: [barryvdh/laravel-dompdf](https://github.com/barryvdh/laravel-dompdf)
-* For Redaxo: [PdfOut](https://github.com/FriendsOfREDAXO/pdfout)
-
-## Quick Start
-
-Just pass your HTML in to dompdf and stream the output:
+The charset option will only be used if the CSS file does not contain an `@charset` declaration. UTF-8 is the default, so you won’t have to create a settings object at all if you don’t intend to change that.
 
 ```php
-// reference the Dompdf namespace
-use Dompdf\Dompdf;
-
-// instantiate and use the dompdf class
-$dompdf = new Dompdf();
-$dompdf->loadHtml('hello world');
-
-// (Optional) Setup the paper size and orientation
-$dompdf->setPaper('A4', 'landscape');
-
-// Render the HTML as PDF
-$dompdf->render();
-
-// Output the generated PDF to Browser
-$dompdf->stream();
+$settings = \Sabberworm\CSS\Settings::create()
+    ->withDefaultCharset('windows-1252');
+$parser = new \Sabberworm\CSS\Parser($css, $settings);
 ```
 
-### Setting Options
+#### Strict parsing
 
-Set options during dompdf instantiation:
+To have the parser throw an exception when encountering invalid/unknown constructs (as opposed to trying to ignore them and carry on parsing), supply a thusly configured `\Sabberworm\CSS\Settings` object:
 
 ```php
-use Dompdf\Dompdf;
-use Dompdf\Options;
-
-$options = new Options();
-$options->set('defaultFont', 'Courier');
-$dompdf = new Dompdf($options);
+$parser = new \Sabberworm\CSS\Parser(
+    file_get_contents('somefile.css'),
+    \Sabberworm\CSS\Settings::create()->beStrict()
+);
 ```
 
-or at run time
+Note that this will also disable a workaround for parsing the unquoted variant of the legacy IE-specific `filter` rule.
+
+#### Disable multibyte functions
+
+To achieve faster parsing, you can choose to have PHP-CSS-Parser use regular string functions instead of `mb_*` functions. This should work fine in most cases, even for UTF-8 files, as all the multibyte characters are in string literals. Still it’s not recommended using this with input you have no control over as it’s not thoroughly covered by test cases.
 
 ```php
-use Dompdf\Dompdf;
-
-$dompdf = new Dompdf();
-$options = $dompdf->getOptions();
-$options->setDefaultFont('Courier');
-$dompdf->setOptions($options);
+$settings = \Sabberworm\CSS\Settings::create()->withMultibyteSupport(false);
+$parser = new \Sabberworm\CSS\Parser($css, $settings);
 ```
 
-See [Dompdf\Options](src/Options.php) for a list of available options.
+### Manipulation
 
-### Resource Reference Requirements
+The resulting data structure consists mainly of five basic types: `CSSList`, `RuleSet`, `Rule`, `Selector` and `Value`. There are two additional types used: `Import` and `Charset`, which you won’t use often.
 
-In order to protect potentially sensitive information Dompdf imposes 
-restrictions on files referenced from the local file system or the web. 
+#### CSSList
 
-Files accessed through web-based protocols have the following requirements:
- * The Dompdf option "isRemoteEnabled" must be set to "true"
- * PHP must either have the curl extension enabled or the 
-   allow_url_fopen setting set to true
-   
-Files accessed through the local file system have the following requirement:
- * The file must fall within the path(s) specified for the Dompdf "chroot" option
+`CSSList` represents a generic CSS container, most likely containing declaration blocks (rule sets with a selector), but it may also contain at-rules, charset declarations, etc.
 
-## Limitations (Known Issues)
+To access the items stored in a `CSSList` – like the document you got back when calling `$parser->parse()` –, use `getContents()`, then iterate over that collection and use `instanceof` to check whether you’re dealing with another `CSSList`, a `RuleSet`, a `Import` or a `Charset`.
 
- * Table cells are not pageable, meaning a table row must fit on a single page: See https://github.com/dompdf/dompdf/issues/98
- * Elements are rendered on the active page when they are parsed.
- * Embedding "raw" SVG's (`<svg><path...></svg>`) isn't working yet: See https://github.com/dompdf/dompdf/issues/320  
-   Workaround: Either link to an external SVG file, or use a DataURI like this:
-     ```php
-     $html = '<img src="data:image/svg+xml;base64,' . base64_encode($svg) . '">';
-     ```
- * Does not support CSS flexbox: See https://github.com/dompdf/dompdf/issues/971
- * Does not support CSS Grid: See https://github.com/dompdf/dompdf/issues/2988
- * A single Dompdf instance should not be used to render more than one HTML document
-   because persisted parsing and rendering artifacts can impact future renders.
----
+To append a new item (selector, media query, etc.) to an existing `CSSList`, construct it using the constructor for this class and use the `append($oItem)` method.
 
-[![Donate button](https://www.paypal.com/en_US/i/btn/btn_donate_SM.gif)](http://goo.gl/DSvWf)
+#### RuleSet
 
-*If you find this project useful, please consider making a donation.
-Any funds donated will be used to help further development on this project.)*
+`RuleSet` is a container for individual rules. The most common form of a rule set is one constrained by a selector. The following concrete subtypes exist:
+
+* `AtRuleSet` – for generic at-rules for generic at-rules which are not covered by specific classes, i.e., not `@import`, `@charset` or `@media`. A common example for this is `@font-face`.
+* `DeclarationBlock` – a `RuleSet` constrained by a `Selector`; contains an array of selector objects (comma-separated in the CSS) as well as the rules to be applied to the matching elements.
+
+Note: A `CSSList` can contain other `CSSList`s (and `Import`s as well as a `Charset`), while a `RuleSet` can only contain `Rule`s.
+
+If you want to manipulate a `RuleSet`, use the methods `addRule(Rule $rule)`, `getRules()` and `removeRule($rule)` (which accepts either a `Rule` or a rule name; optionally suffixed by a dash to remove all related rules).
+
+#### Rule
+
+`Rule`s just have a string key (the rule) and a `Value`.
+
+#### Value
+
+`Value` is an abstract class that only defines the `render` method. The concrete subclasses for atomic value types are:
+
+* `Size` – consists of a numeric `size` value and a unit.
+* `Color` – colors can be input in the form #rrggbb, #rgb or schema(val1, val2, …) but are always stored as an array of ('s' => val1, 'c' => val2, 'h' => val3, …) and output in the second form.
+* `CSSString` – this is just a wrapper for quoted strings to distinguish them from keywords; always output with double quotes.
+* `URL` – URLs in CSS; always output in `URL("")` notation.
+
+There is another abstract subclass of `Value`, `ValueList`: A `ValueList` represents a lists of `Value`s, separated by some separation character (mostly `,`, whitespace, or `/`).
+
+There are two types of `ValueList`s:
+
+* `RuleValueList` – The default type, used to represent all multivalued rules like `font: bold 12px/3 Helvetica, Verdana, sans-serif;` (where the value would be a whitespace-separated list of the primitive value `bold`, a slash-separated list and a comma-separated list).
+* `CSSFunction` – A special kind of value that also contains a function name and where the values are the function’s arguments. Also handles equals-sign-separated argument lists like `filter: alpha(opacity=90);`.
+
+#### Convenience methods
+
+There are a few convenience methods on `Document` to ease finding, manipulating and deleting rules:
+
+* `getAllDeclarationBlocks()` – does what it says; no matter how deeply nested the selectors are. Aliased as `getAllSelectors()`.
+* `getAllRuleSets()` – does what it says; no matter how deeply nested the rule sets are.
+* `getAllValues()` – finds all `Value` objects inside `Rule`s.
+
+## To-Do
+
+* More convenience methods (like `selectorsWithElement($sId/Class/TagName)`, `attributesOfType($type)`, `removeAttributesOfType($type)`)
+* Real multibyte support. Currently, only multibyte charsets whose first 255 code points take up only one byte and are identical with ASCII are supported (yes, UTF-8 fits this description).
+* Named color support (using `Color` instead of an anonymous string literal)
+
+## Use cases
+
+### Use `Parser` to prepend an ID to all selectors
+
+```php
+$myId = "#my_id";
+$parser = new \Sabberworm\CSS\Parser($css);
+$cssDocument = $parser->parse();
+foreach ($cssDocument->getAllDeclarationBlocks() as $block) {
+    foreach ($block->getSelectors() as $selector) {
+        // Loop over all selector parts (the comma-separated strings in a
+        // selector) and prepend the ID.
+        $selector->setSelector($myId.' '.$selector->getSelector());
+    }
+}
+```
+
+### Shrink all absolute sizes to half
+
+```php
+$parser = new \Sabberworm\CSS\Parser($css);
+$cssDocument = $parser->parse();
+foreach ($cssDocument->getAllValues() as $value) {
+    if ($value instanceof CSSSize && !$value->isRelative()) {
+        $value->setSize($value->getSize() / 2);
+    }
+}
+```
+
+### Remove unwanted rules
+
+```php
+$parser = new \Sabberworm\CSS\Parser($css);
+$cssDocument = $parser->parse();
+foreach($cssDocument->getAllRuleSets() as $oRuleSet) {
+    // Note that the added dash will make this remove all rules starting with
+    // `font-` (like `font-size`, `font-weight`, etc.) as well as a potential
+    // `font` rule.
+    $oRuleSet->removeRule('font-'); 
+    $oRuleSet->removeRule('cursor');
+}
+```
+
+### Output
+
+To output the entire CSS document into a variable, just use `->render()`:
+
+```php
+$parser = new \Sabberworm\CSS\Parser(file_get_contents('somefile.css'));
+$cssDocument = $parser->parse();
+print $cssDocument->render();
+```
+
+If you want to format the output, pass an instance of type `\Sabberworm\CSS\OutputFormat`:
+
+```php
+$format = \Sabberworm\CSS\OutputFormat::create()
+    ->indentWithSpaces(4)->setSpaceBetweenRules("\n");
+print $cssDocument->render($format);
+```
+
+Or use one of the predefined formats:
+
+```php
+print $cssDocument->render(Sabberworm\CSS\OutputFormat::createPretty());
+print $cssDocument->render(Sabberworm\CSS\OutputFormat::createCompact());
+```
+
+To see what you can do with output formatting, look at the tests in `tests/OutputFormatTest.php`.
+
+## Examples
+
+### Example 1 (At-Rules)
+
+#### Input
+
+```css
+@charset "utf-8";
+
+@font-face {
+  font-family: "CrassRoots";
+  src: url("../media/cr.ttf");
+}
+
+html, body {
+    font-size: 1.6em;
+}
+
+@keyframes mymove {
+    from { top: 0px; }
+    to { top: 200px; }
+}
+
+```
+
+<details>
+  <summary><b>Structure (<code>var_dump()</code>)</b></summary>
+
+```php
+class Sabberworm\CSS\CSSList\Document#4 (2) {
+  protected $aContents =>
+  array(4) {
+    [0] =>
+    class Sabberworm\CSS\Property\Charset#6 (2) {
+      private $sCharset =>
+      class Sabberworm\CSS\Value\CSSString#5 (2) {
+        private $sString =>
+        string(5) "utf-8"
+        protected $iLineNo =>
+        int(1)
+      }
+      protected $iLineNo =>
+      int(1)
+    }
+    [1] =>
+    class Sabberworm\CSS\RuleSet\AtRuleSet#7 (4) {
+      private $sType =>
+      string(9) "font-face"
+      private $sArgs =>
+      string(0) ""
+      private $aRules =>
+      array(2) {
+        'font-family' =>
+        array(1) {
+          [0] =>
+          class Sabberworm\CSS\Rule\Rule#8 (4) {
+            private $sRule =>
+            string(11) "font-family"
+            private $mValue =>
+            class Sabberworm\CSS\Value\CSSString#9 (2) {
+              private $sString =>
+              string(10) "CrassRoots"
+              protected $iLineNo =>
+              int(4)
+            }
+            private $bIsImportant =>
+            bool(false)
+            protected $iLineNo =>
+            int(4)
+          }
+        }
+        'src' =>
+        array(1) {
+          [0] =>
+          class Sabberworm\CSS\Rule\Rule#10 (4) {
+            private $sRule =>
+            string(3) "src"
+            private $mValue =>
+            class Sabberworm\CSS\Value\URL#11 (2) {
+              private $oURL =>
+              class Sabberworm\CSS\Value\CSSString#12 (2) {
+                private $sString =>
+                string(15) "../media/cr.ttf"
+                protected $iLineNo =>
+                int(5)
+              }
+              protected $iLineNo =>
+              int(5)
+            }
+            private $bIsImportant =>
+            bool(false)
+            protected $iLineNo =>
+            int(5)
+          }
+        }
+      }
+      protected $iLineNo =>
+      int(3)
+    }
+    [2] =>
+    class Sabberworm\CSS\RuleSet\DeclarationBlock#13 (3) {
+      private $aSelectors =>
+      array(2) {
+        [0] =>
+        class Sabberworm\CSS\Property\Selector#14 (2) {
+          private $sSelector =>
+          string(4) "html"
+          private $iSpecificity =>
+          NULL
+        }
+        [1] =>
+        class Sabberworm\CSS\Property\Selector#15 (2) {
+          private $sSelector =>
+          string(4) "body"
+          private $iSpecificity =>
+          NULL
+        }
+      }
+      private $aRules =>
+      array(1) {
+        'font-size' =>
+        array(1) {
+          [0] =>
+          class Sabberworm\CSS\Rule\Rule#16 (4) {
+            private $sRule =>
+            string(9) "font-size"
+            private $mValue =>
+            class Sabberworm\CSS\Value\Size#17 (4) {
+              private $fSize =>
+              double(1.6)
+              private $sUnit =>
+              string(2) "em"
+              private $bIsColorComponent =>
+              bool(false)
+              protected $iLineNo =>
+              int(9)
+            }
+            private $bIsImportant =>
+            bool(false)
+            protected $iLineNo =>
+            int(9)
+          }
+        }
+      }
+      protected $iLineNo =>
+      int(8)
+    }
+    [3] =>
+    class Sabberworm\CSS\CSSList\KeyFrame#18 (4) {
+      private $vendorKeyFrame =>
+      string(9) "keyframes"
+      private $animationName =>
+      string(6) "mymove"
+      protected $aContents =>
+      array(2) {
+        [0] =>
+        class Sabberworm\CSS\RuleSet\DeclarationBlock#19 (3) {
+          private $aSelectors =>
+          array(1) {
+            [0] =>
+            class Sabberworm\CSS\Property\Selector#20 (2) {
+              private $sSelector =>
+              string(4) "from"
+              private $iSpecificity =>
+              NULL
+            }
+          }
+          private $aRules =>
+          array(1) {
+            'top' =>
+            array(1) {
+              [0] =>
+              class Sabberworm\CSS\Rule\Rule#21 (4) {
+                private $sRule =>
+                string(3) "top"
+                private $mValue =>
+                class Sabberworm\CSS\Value\Size#22 (4) {
+                  private $fSize =>
+                  double(0)
+                  private $sUnit =>
+                  string(2) "px"
+                  private $bIsColorComponent =>
+                  bool(false)
+                  protected $iLineNo =>
+                  int(13)
+                }
+                private $bIsImportant =>
+                bool(false)
+                protected $iLineNo =>
+                int(13)
+              }
+            }
+          }
+          protected $iLineNo =>
+          int(13)
+        }
+        [1] =>
+        class Sabberworm\CSS\RuleSet\DeclarationBlock#23 (3) {
+          private $aSelectors =>
+          array(1) {
+            [0] =>
+            class Sabberworm\CSS\Property\Selector#24 (2) {
+              private $sSelector =>
+              string(2) "to"
+              private $iSpecificity =>
+              NULL
+            }
+          }
+          private $aRules =>
+          array(1) {
+            'top' =>
+            array(1) {
+              [0] =>
+              class Sabberworm\CSS\Rule\Rule#25 (4) {
+                private $sRule =>
+                string(3) "top"
+                private $mValue =>
+                class Sabberworm\CSS\Value\Size#26 (4) {
+                  private $fSize =>
+                  double(200)
+                  private $sUnit =>
+                  string(2) "px"
+                  private $bIsColorComponent =>
+                  bool(false)
+                  protected $iLineNo =>
+                  int(14)
+                }
+                private $bIsImportant =>
+                bool(false)
+                protected $iLineNo =>
+                int(14)
+              }
+            }
+          }
+          protected $iLineNo =>
+          int(14)
+        }
+      }
+      protected $iLineNo =>
+      int(12)
+    }
+  }
+  protected $iLineNo =>
+  int(1)
+}
+
+```
+</details>
+
+#### Output (`render()`)
+
+```css
+@charset "utf-8";
+@font-face {font-family: "CrassRoots";src: url("../media/cr.ttf");}
+html, body {font-size: 1.6em;}
+@keyframes mymove {from {top: 0px;} to {top: 200px;}}
+```
+
+### Example 2 (Values)
+
+#### Input
+
+```css
+#header {
+    margin: 10px 2em 1cm 2%;
+    font-family: Verdana, Helvetica, "Gill Sans", sans-serif;
+    color: red !important;
+}
+
+```
+
+<details>
+  <summary><b>Structure (<code>var_dump()</code>)</b></summary>
+
+```php
+class Sabberworm\CSS\CSSList\Document#4 (2) {
+  protected $aContents =>
+  array(1) {
+    [0] =>
+    class Sabberworm\CSS\RuleSet\DeclarationBlock#5 (3) {
+      private $aSelectors =>
+      array(1) {
+        [0] =>
+        class Sabberworm\CSS\Property\Selector#6 (2) {
+          private $sSelector =>
+          string(7) "#header"
+          private $iSpecificity =>
+          NULL
+        }
+      }
+      private $aRules =>
+      array(3) {
+        'margin' =>
+        array(1) {
+          [0] =>
+          class Sabberworm\CSS\Rule\Rule#7 (4) {
+            private $sRule =>
+            string(6) "margin"
+            private $mValue =>
+            class Sabberworm\CSS\Value\RuleValueList#12 (3) {
+              protected $aComponents =>
+              array(4) {
+                [0] =>
+                class Sabberworm\CSS\Value\Size#8 (4) {
+                  private $fSize =>
+                  double(10)
+                  private $sUnit =>
+                  string(2) "px"
+                  private $bIsColorComponent =>
+                  bool(false)
+                  protected $iLineNo =>
+                  int(2)
+                }
+                [1] =>
+                class Sabberworm\CSS\Value\Size#9 (4) {
+                  private $fSize =>
+                  double(2)
+                  private $sUnit =>
+                  string(2) "em"
+                  private $bIsColorComponent =>
+                  bool(false)
+                  protected $iLineNo =>
+                  int(2)
+                }
+                [2] =>
+                class Sabberworm\CSS\Value\Size#10 (4) {
+                  private $fSize =>
+                  double(1)
+                  private $sUnit =>
+                  string(2) "cm"
+                  private $bIsColorComponent =>
+                  bool(false)
+                  protected $iLineNo =>
+                  int(2)
+                }
+                [3] =>
+                class Sabberworm\CSS\Value\Size#11 (4) {
+                  private $fSize =>
+                  double(2)
+                  private $sUnit =>
+                  string(1) "%"
+                  private $bIsColorComponent =>
+                  bool(false)
+                  protected $iLineNo =>
+                  int(2)
+                }
+              }
+              protected $sSeparator =>
+              string(1) " "
+              protected $iLineNo =>
+              int(2)
+            }
+            private $bIsImportant =>
+            bool(false)
+            protected $iLineNo =>
+            int(2)
+          }
+        }
+        'font-family' =>
+        array(1) {
+          [0] =>
+          class Sabberworm\CSS\Rule\Rule#13 (4) {
+            private $sRule =>
+            string(11) "font-family"
+            private $mValue =>
+            class Sabberworm\CSS\Value\RuleValueList#15 (3) {
+              protected $aComponents =>
+              array(4) {
+                [0] =>
+                string(7) "Verdana"
+                [1] =>
+                string(9) "Helvetica"
+                [2] =>
+                class Sabberworm\CSS\Value\CSSString#14 (2) {
+                  private $sString =>
+                  string(9) "Gill Sans"
+                  protected $iLineNo =>
+                  int(3)
+                }
+                [3] =>
+                string(10) "sans-serif"
+              }
+              protected $sSeparator =>
+              string(1) ","
+              protected $iLineNo =>
+              int(3)
+            }
+            private $bIsImportant =>
+            bool(false)
+            protected $iLineNo =>
+            int(3)
+          }
+        }
+        'color' =>
+        array(1) {
+          [0] =>
+          class Sabberworm\CSS\Rule\Rule#16 (4) {
+            private $sRule =>
+            string(5) "color"
+            private $mValue =>
+            string(3) "red"
+            private $bIsImportant =>
+            bool(true)
+            protected $iLineNo =>
+            int(4)
+          }
+        }
+      }
+      protected $iLineNo =>
+      int(1)
+    }
+  }
+  protected $iLineNo =>
+  int(1)
+}
+
+```
+</details>
+
+#### Output (`render()`)
+
+```css
+#header {margin: 10px 2em 1cm 2%;font-family: Verdana,Helvetica,"Gill Sans",sans-serif;color: red !important;}
+```
+
+## Contributors/Thanks to
+
+* [oliverklee](https://github.com/oliverklee) for lots of refactorings, code modernizations and CI integrations
+* [raxbg](https://github.com/raxbg) for contributions to parse `calc`, grid lines, and various bugfixes.
+* [westonruter](https://github.com/westonruter) for bugfixes and improvements.
+* [FMCorz](https://github.com/FMCorz) for many patches and suggestions, for being able to parse comments and IE hacks (in lenient mode).
+* [Lullabot](https://github.com/Lullabot) for a patch that allows to know the line number for each parsed token.
+* [ju1ius](https://github.com/ju1ius) for the specificity parsing code and the ability to expand/compact shorthand properties.
+* [ossinkine](https://github.com/ossinkine) for a 150 time performance boost.
+* [GaryJones](https://github.com/GaryJones) for lots of input and [https://css-specificity.info/](https://css-specificity.info/).
+* [docteurklein](https://github.com/docteurklein) for output formatting and `CSSList->remove()` inspiration.
+* [nicolopignatelli](https://github.com/nicolopignatelli) for PSR-0 compatibility.
+* [diegoembarcadero](https://github.com/diegoembarcadero) for keyframe at-rule parsing.
+* [goetas](https://github.com/goetas) for @namespace at-rule support.
+* [View full list](https://github.com/sabberworm/PHP-CSS-Parser/contributors)
+
+## Misc
+
+* Legacy Support: The latest pre-PSR-0 version of this project can be checked with the `0.9.0` tag.
+* Running Tests: To run all unit tests for this project, run `composer install` to install phpunit and use `./vendor/bin/phpunit`.

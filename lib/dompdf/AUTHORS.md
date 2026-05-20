@@ -1,24 +1,17 @@
-Dompdf was designed and developed by Benj Carson.
+SvgLib was designed and developed by Fabien Ménager.
 
 ### Current Team
 
 * **Brian Sweeney** (maintainer)
-* **Till Berger**
 
 ### Alumni
 
-* **Benj Carson** (creator)
-* **Fabien Ménager**
-* **Simon Berger**
-* **Orion Richardson**
+* **Fabien Ménager** (creator)
 
 ### Contributors
-* **Gabriel Bull**
-* **Barry vd. Heuvel**
-* **Ryan H. Masten**
-* **Helmut Tischer**
-* [and many more...](https://github.com/dompdf/dompdf/graphs/contributors)
+* **ssddanbrown**
+* [and many more...](https://github.com/dompdf/php-svg-lib/graphs/contributors)
 
 ### Thanks
 
-Dompdf would not have been possible without strong community support.
+SvgLib would not have been possible without strong community support.

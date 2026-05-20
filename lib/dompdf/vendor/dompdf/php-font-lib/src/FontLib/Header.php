@@ -4,33 +4,28 @@
  * @link    https://github.com/dompdf/php-font-lib
  * @license http://www.gnu.org/copyleft/lesser.html GNU Lesser General Public License
  */
-namespace FontLib;
 
-use FontLib\TrueType\File;
+namespace FontLib\WOFF;
 
 /**
- * Font header container.
+ * WOFF font file header.
  *
  * @package php-font-lib
  */
-abstract class Header extends BinaryStream {
-  /**
-   * @var File
-   */
-  protected $font;
-  protected $def = array();
-
-  public $data;
-
-  public function __construct(File $font) {
-    $this->font = $font;
-  }
-
-  public function encode() {
-    return $this->font->pack($this->def, $this->data);
-  }
-
-  public function parse() {
-    $this->data = $this->font->unpack($this->def);
-  }
+class Header extends \FontLib\TrueType\Header {
+  protected $def = array(
+    "format"         => self::uint32,
+    "flavor"         => self::uint32,
+    "length"         => self::uint32,
+    "numTables"      => self::uint16,
+    self::uint16,
+    "totalSfntSize"  => self::uint32,
+    "majorVersion"   => self::uint16,
+    "minorVersion"   => self::uint16,
+    "metaOffset"     => self::uint32,
+    "metaLength"     => self::uint32,
+    "metaOrigLength" => self::uint32,
+    "privOffset"     => self::uint32,
+    "privLength"     => self::uint32,
+  );
 }

@@ -50,9 +50,16 @@ if (!function_exists('acme_credits_admin_page')) {
 
     global $wpdb;
 
-    // Dados (Serviços)
-    $servicesT = acme_table_services();
-    $services  = $wpdb->get_results("SELECT slug, name, credits_cost FROM {$servicesT} ORDER BY name ASC");
+    /**
+     * Dados de serviços.
+     *
+     * A query SQL direta foi removida deste controller e delegada ao
+     * ServiceRepository. O controller continua responsável apenas por montar a
+     * tela administrativa, preservando o slug, a capability e o formulário
+     * público já utilizados pelo WordPress.
+     */
+    $serviceRepository = new \Acme\AccountControl\Models\ServiceRepository($wpdb);
+    $services = $serviceRepository->listForSelection();
 
     // Dados (Usuários)
     // lista filhos + netos (se quiser restringir só filhos, troque roles abaixo)
