@@ -1,0 +1,393 @@
+<?php
+if (!defined('ABSPATH')) {
+    exit;
+}
+
+$apiEnabled = function_exists('acme_api_public_is_enabled')
+    ? acme_api_public_is_enabled()
+    : true;
+
+$noticeData = get_transient('acme_api_panel_notice_' . get_current_user_id());
+if ($noticeData) {
+    delete_transient('acme_api_panel_notice_' . get_current_user_id());
+}
+
+$plainKeyData = get_transient('acme_api_consumer_plain_key_front_' . get_current_user_id());
+if ($plainKeyData) {
+    delete_transient('acme_api_consumer_plain_key_front_' . get_current_user_id());
+}
+
+$currentUsers = get_users([
+    'orderby' => 'display_name',
+    'order'   => 'ASC',
+    'number'  => 500,
+    'fields'  => ['ID', 'display_name', 'user_email', 'user_login'],
+]);
+
+// =========================
+// Filtros (GET)
+// =========================
+$filterUserId  = isset($_GET['filter_user_id']) ? (int) $_GET['filter_user_id'] : 0;
+$filterStatus  = isset($_GET['filter_status']) ? sanitize_text_field($_GET['filter_status']) : '';
+$filterService = isset($_GET['filter_service']) ? sanitize_text_field($_GET['filter_service']) : '';
+
+$filters = [
+    'user_id' => $filterUserId,
+    'status'  => $filterStatus,
+    'service' => $filterService,
+];
+
+// =========================
+// Consumidores com filtros
+// =========================
+$consumerRows = function_exists('acme_api_consumer_get_all')
+    ? acme_api_consumer_get_all(200, $filters)
+    : [];
+
+$activeCount = 0;
+$revokedCount = 0;
+$lastUsageLabel = '—';
+
+foreach ($consumerRows as $consumerRow) {
+    $rowStatus = (string) ($consumerRow['status'] ?? '');
+
+    if ($rowStatus === 'active') {
+        $activeCount++;
+    }
+
+    if ($rowStatus === 'revoked') {
+        $revokedCount++;
+    }
+}
+
+$lastUsedValues = array_filter(array_map(static function ($row) {
+    return (string) ($row['last_used_at'] ?? '');
+}, $consumerRows));
+
+if (!empty($lastUsedValues)) {
+    rsort($lastUsedValues);
+    $lastUsageLabel = (string) $lastUsedValues[0];
+}
+?>
+
+<div class="acme-api-panel">
+
+    <!-- HEADER -->
+    <div class="acme-api-panel-header">
+        <div>
+            <h2>API Control Panel</h2>
+            <p class="acme-api-panel-subtitle">
+                Painel administrativo para controle da API pública, chaves de acesso e operação segura.
+            </p>
+        </div>
+        <span class="acme-api-admin-badge">Somente admin</span>
+    </div>
+
+    <?php if (!empty($noticeData['message'])) : ?>
+        <div class="acme-api-notice acme-api-notice-<?php echo esc_attr(($noticeData['type'] ?? 'success') === 'error' ? 'error' : 'success'); ?>">
+            <?php echo esc_html($noticeData['message']); ?>
+        </div>
+    <?php endif; ?>
+
+    <?php if (is_array($plainKeyData) && !empty($plainKeyData['api_key'])) : ?>
+        <div class="acme-api-notice acme-api-notice-warning">
+            <strong>Guarde esta chave agora.</strong>
+            <div class="acme-api-key-box">
+                <code><?php echo esc_html($plainKeyData['api_key']); ?></code>
+            </div>
+        </div>
+    <?php endif; ?>
+
+    <!-- STATUS GLOBAL -->
+    <form method="post">
+        <?php wp_nonce_field('acme_api_panel', 'acme_api_nonce'); ?>
+        <input type="hidden" name="acme_api_panel_action" value="toggle_global_api">
+
+        <div class="acme-api-card">
+            <div class="acme-api-status-row">
+                <div>
+                    <h3>Status global da API</h3>
+                    <p class="acme-api-status-text">
+                        API pública:
+                        <span class="acme-api-status-pill <?php echo $apiEnabled ? 'active' : 'disabled'; ?>">
+                            <?php echo $apiEnabled ? 'ATIVA' : 'BLOQUEADA'; ?>
+                        </span>
+                    </p>
+                </div>
+
+                <div class="acme-api-actions">
+                    <button type="submit" name="api_global_toggle" value="0" class="acme-api-button acme-api-button-danger">
+                        Bloquear API
+                    </button>
+
+                    <button type="submit" name="api_global_toggle" value="1" class="acme-api-button acme-api-button-success">
+                        Reativar API
+                    </button>
+                </div>
+            </div>
+        </div>
+    </form>
+
+    <!-- GRID -->
+    <div class="acme-api-grid">
+
+        <!-- COLUNA ESQUERDA -->
+        <div>
+
+            <!-- GERAR NOVA CHAVE -->
+            <div class="acme-api-card">
+                <h3>Gerar nova chave</h3>
+                <form method="post">
+                    <?php wp_nonce_field('acme_api_panel', 'acme_api_nonce'); ?>
+                    <input type="hidden" name="acme_api_panel_action" value="create_consumer_key">
+
+                    <div class="acme-api-form-row">
+                        <div class="acme-api-field">
+                            <label for="acme-api-user">Usuário</label>
+                            <select id="acme-api-user" name="consumer_user_id" required>
+                                <option value="">Selecionar usuário</option>
+                                <?php foreach ($currentUsers as $currentUser) : ?>
+                                    <option value="<?php echo esc_attr($currentUser->ID); ?>">
+                                        <?php echo esc_html($currentUser->display_name); ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+
+                        <div class="acme-api-field">
+                            <label for="acme-api-key-name">Nome da chave</label>
+                            <input id="acme-api-key-name" type="text" name="consumer_name" required>
+                        </div>
+                    </div>
+
+                    <div class="acme-api-field">
+                        <label>Serviços liberados</label>
+                        <div class="acme-api-service-list">
+                            <label class="acme-api-service-item">
+                                <input type="checkbox" name="allowed_services[]" value="clt" checked>
+                                clt
+                            </label>
+
+                            <label class="acme-api-service-item">
+                                <input type="checkbox" name="allowed_services[]" value="inss">
+                                inss
+                            </label>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="acme-api-button acme-api-button-success">
+                        Gerar chave
+                    </button>
+                </form>
+            </div>
+
+        </div>
+
+        <!-- COLUNA DIREITA -->
+        <div>
+
+            <!-- SUMMARY -->
+            <div class="acme-api-summary-grid">
+                <div class="acme-api-summary-card">
+                    <span class="acme-api-summary-label">Consumidores ativos</span>
+                    <span class="acme-api-summary-value"><?php echo (int) $activeCount; ?></span>
+                </div>
+
+                <div class="acme-api-summary-card">
+                    <span class="acme-api-summary-label">Chaves revogadas</span>
+                    <span class="acme-api-summary-value"><?php echo (int) $revokedCount; ?></span>
+                </div>
+
+                <div class="acme-api-summary-card">
+                    <span class="acme-api-summary-label">Último uso da API</span>
+                    <span class="acme-api-summary-value" style="font-size:18px;">
+                        <?php echo !empty($lastUsageLabel) ? date_i18n('d/m/Y H:i:s', strtotime($lastUsageLabel)) : ''; ?>
+                    </span>
+                </div>
+            </div>
+
+            <!-- FILTROS -->
+            <div class="acme-api-card" style="margin-top:20px;">
+                <h3>Filtros</h3>
+
+                <form method="get">
+                    <div class="acme-api-form-row">
+
+                        <div class="acme-api-field">
+                            <label>Usuário</label>
+                            <select id="acme-filter-user" name="filter_user_id">
+                                <option value="">Todos</option>
+                                <?php foreach ($currentUsers as $user) : ?>
+                                    <option value="<?php echo esc_attr($user->ID); ?>" <?php selected($filterUserId, $user->ID); ?>>
+                                        <?php echo esc_html($user->display_name); ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+
+                        <div class="acme-api-field">
+                            <label>Status</label>
+                            <select id="acme-filter-status" name="filter_status">
+                                <option value="">Todos</option>
+                                <option value="active" <?php selected($filterStatus, 'active'); ?>>Ativo</option>
+                                <option value="inactive" <?php selected($filterStatus, 'inactive'); ?>>Inativo</option>
+                                <option value="revoked" <?php selected($filterStatus, 'revoked'); ?>>Revogado</option>
+                            </select>
+                        </div>
+
+                        <div class="acme-api-field">
+                            <label>Serviço</label>
+                            <select id="acme-filter-service" name="filter_service">
+                                <option value="">Todos</option>
+                                <option value="clt" <?php selected($filterService, 'clt'); ?>>clt</option>
+                                <option value="inss" <?php selected($filterService, 'inss'); ?>>inss</option>
+                            </select>
+                        </div>
+
+                    </div>
+
+                    <div style="margin-top:15px;">
+                        <button type="submit" class="acme-api-button acme-api-button-primary">
+                            Filtrar
+                        </button>
+
+                        <a href="<?php echo esc_url(remove_query_arg(['filter_user_id', 'filter_status', 'filter_service'])); ?>"
+                            class="acme-api-button acme-api-button-secondary">
+                            Limpar
+                        </a>
+                    </div>
+                </form>
+            </div>
+
+        </div>
+
+    </div> <!-- FIM GRID -->
+
+    <!-- CONSUMIDORES 100% LARGURA -->
+    <div class="acme-api-card" style="margin-top:20px;">
+        <h3>Consumidores</h3>
+
+        <div class="acme-api-table-wrap">
+            <table class="acme-api-table">
+                <thead>
+                    <tr>
+                        <th>Nome</th>
+                        <th>Usuário</th>
+                        <th>Serviços</th>
+                        <th>Status</th>
+                        <th>Prefixo</th>
+                        <th>Último uso</th>
+                        <th>Criado em</th>
+                        <th>Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php if (empty($consumerRows)) : ?>
+                        <tr>
+                            <td colspan="8">Nenhuma chave cadastrada até o momento.</td>
+                        </tr>
+                    <?php else : ?>
+                        <?php foreach ($consumerRows as $consumerRow) : ?>
+                            <?php
+                            $wpUserId = (int) ($consumerRow['wp_user_id'] ?? 0);
+                            $linkedUser = $wpUserId > 0 ? get_user_by('id', $wpUserId) : false;
+                            $linkedUserLabel = $linkedUser
+                                ? sprintf('%s', $linkedUser->display_name)
+                                : '#' . $wpUserId . ' — usuário não encontrado';
+
+                            $rowStatus = (string) ($consumerRow['status'] ?? '');
+                            $statusClass = 'acme-api-tag-revoked';
+                            $statusLabel = 'Revogado';
+
+                            if ($rowStatus === 'active') {
+                                $statusClass = 'acme-api-tag-active';
+                                $statusLabel = 'Ativo';
+                            } elseif ($rowStatus === 'inactive') {
+                                $statusClass = 'acme-api-tag-inactive';
+                                $statusLabel = 'Inativo';
+                            }
+                            ?>
+                            <tr>
+                                <td><?php echo esc_html((string) ($consumerRow['consumer_name'] ?? '')); ?></td>
+                                <td><?php echo esc_html($linkedUserLabel); ?></td>
+                                <td><?php echo esc_html((string) ($consumerRow['allowed_services'] ?? '')); ?></td>
+                                <td>
+                                    <span class="acme-api-tag <?php echo esc_attr($statusClass); ?>">
+                                        <?php echo esc_html($statusLabel); ?>
+                                    </span>
+                                </td>
+                                <td>
+                                    <code><?php echo esc_html((string) ($consumerRow['api_key_prefix'] ?? '')); ?>...</code>
+                                </td>
+
+                                <?php $ultima_atualicao = $consumerRow['last_used_at'] ? date_i18n('d/m/Y H:i:s', strtotime($consumerRow['last_used_at'])) : '';
+                                $criado_em = $consumerRow['created_at'] ? date_i18n('d/m/Y H:i:s', strtotime($consumerRow['created_at'])) : '';
+                                ?>
+
+
+                                <td><?php echo $ultima_atualicao ?? '—'; ?></td>
+                                <td><?php echo $criado_em ?? '—'; ?></td>
+
+                                <td>
+                                    <div class="acme-api-row-actions">
+                                        <?php if ($rowStatus === 'active') : ?>
+                                            <form method="post" class="acme-api-inline-form" onsubmit="return confirm('Tem certeza que deseja inativar esta chave?');">
+                                                <?php wp_nonce_field('acme_api_panel', 'acme_api_nonce'); ?>
+                                                <input type="hidden" name="acme_api_panel_action" value="update_consumer_status">
+                                                <input type="hidden" name="consumer_id" value="<?php echo (int) ($consumerRow['id'] ?? 0); ?>">
+                                                <input type="hidden" name="target_status" value="inactive">
+                                                <button
+                                                    type="submit"
+                                                    class="acme-api-icon-button acme-api-link-button-warning"
+                                                    title="Inativar chave"
+                                                    aria-label="Inativar chave">
+                                                    <span class="dashicons dashicons-hidden" aria-hidden="true"></span>
+                                                </button>
+                                            </form>
+                                        <?php endif; ?>
+
+                                        <?php if ($rowStatus === 'inactive') : ?>
+                                            <form method="post" class="acme-api-inline-form" onsubmit="return confirm('Tem certeza que deseja reativar esta chave?');">
+                                                <?php wp_nonce_field('acme_api_panel', 'acme_api_nonce'); ?>
+                                                <input type="hidden" name="acme_api_panel_action" value="update_consumer_status">
+                                                <input type="hidden" name="consumer_id" value="<?php echo (int) ($consumerRow['id'] ?? 0); ?>">
+                                                <input type="hidden" name="target_status" value="active">
+                                                <button
+                                                    type="submit"
+                                                    class="acme-api-icon-button acme-api-link-button-success"
+                                                    title="Reativar chave"
+                                                    aria-label="Reativar chave">
+                                                    <span class="dashicons dashicons-yes-alt" aria-hidden="true"></span>
+                                                </button>
+                                            </form>
+                                        <?php endif; ?>
+
+                                        <?php if ($rowStatus !== 'revoked') : ?>
+                                            <form method="post" class="acme-api-inline-form" onsubmit="return confirm('Tem certeza que deseja revogar esta chave? Essa ação não pode ser desfeita!');">
+                                                <?php wp_nonce_field('acme_api_panel', 'acme_api_nonce'); ?>
+                                                <input type="hidden" name="acme_api_panel_action" value="update_consumer_status">
+                                                <input type="hidden" name="consumer_id" value="<?php echo (int) ($consumerRow['id'] ?? 0); ?>">
+                                                <input type="hidden" name="target_status" value="revoked">
+                                                <button
+                                                    type="submit"
+                                                    class="acme-api-icon-button acme-api-link-button-danger"
+                                                    title="Revogar chave"
+                                                    aria-label="Revogar chave">
+                                                    <span class="dashicons dashicons-dismiss" aria-hidden="true"></span>
+                                                </button>
+                                            </form>
+                                        <?php endif; ?>
+
+
+                                    </div>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+</div>
+</div>

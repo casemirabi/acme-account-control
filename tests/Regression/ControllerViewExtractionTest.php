@@ -38,9 +38,10 @@ $assertFileExists('app/Controllers/Admin/AdminPageController.php');
 $assertFileExists('app/Controllers/Admin/ApiConsumersAdminController.php');
 
 $assertContains('app/Views/View.php', 'captureLegacy');
+$assertFileExists('app/Views/frontend/api-consumers-panel.php');
 $assertContains('app/Views/View.php', 'resolveAppViewPath');
 $assertContains('app/Controllers/Frontend/ApiControlPanelController.php', 'acme_api_control_panel_handle_post');
-$assertContains('app/Controllers/Frontend/ApiControlPanelController.php', "captureLegacy('includes/views/api-consumers-panel.php')");
+$assertContains('app/Controllers/Frontend/ApiControlPanelController.php', "capture('frontend.api-consumers-panel')");
 $assertContains('includes/controllers/api-consumers-frontend.php', 'ApiControlPanelController(ACME_ACC_PATH))->shortcode()');
 $assertContains('includes/controllers/api-consumers-frontend.php', 'enqueueAssetsWhenShortcodeIsPresent');
 $assertContains('acme-account-control.php', "/app/Views/View.php");

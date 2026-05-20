@@ -21,8 +21,8 @@ use Acme\AccountControl\Views\View;
  *
  * Compatibilidade:
  * - O shortcode continua sendo `[acme_api_control_panel]`.
- * - O template legado `includes/views/api-consumers-panel.php` continua sendo
- *   usado nesta etapa para evitar regressão visual.
+ * - O template foi movido para `app/Views/frontend/api-consumers-panel.php`.
+ * - A renderização agora usa o renderer MVC, sem manter template em `includes/views`.
  * - A função global `acme_api_control_panel_shortcode()` permanece como wrapper
  *   para instalações ou snippets que a chamem diretamente.
  */
@@ -76,7 +76,7 @@ final class ApiControlPanelController
         }
 
         try {
-            return $this->view->captureLegacy('includes/views/api-consumers-panel.php');
+            return $this->view->capture('frontend.api-consumers-panel');
         } catch (\Throwable $exception) {
             // Shortcodes não devem gerar erro fatal na página pública. Retornamos
             // mensagem segura e registramos o detalhe para debug do servidor.
