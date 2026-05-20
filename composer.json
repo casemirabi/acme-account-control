@@ -18,6 +18,6 @@
   "require-dev": {},
   "scripts": {
     "test:syntax": "find . -path ./lib -prune -o -path ./vendor -prune -o -name '*.php' -print0 | xargs -0 -n1 php -l",
-    "test:regression": "php tests/Regression/PluginStructureTest.php && php tests/Regression/HookManifestTest.php && php tests/Regression/ServiceExtractionTest.php && php tests/Regression/RepositoryExtractionTest.php && php tests/Regression/ControllerViewExtractionTest.php && php tests/Regression/FinalHardeningTest.php && php tests/Regression/LegacyRemovalBatchOneTest.php"
+    "test:regression": "php tests/Regression/PluginStructureTest.php && php tests/Regression/HookManifestTest.php && php tests/Regression/ServiceExtractionTest.php && php tests/Regression/RepositoryExtractionTest.php && php tests/Regression/ControllerViewExtractionTest.php && php tests/Regression/FinalHardeningTest.php && php tests/Regression/LegacyRemovalBatchOneTest.php && php tests/Regression/LegacyRemovalBatchTwoTest.php"
   }
 }
