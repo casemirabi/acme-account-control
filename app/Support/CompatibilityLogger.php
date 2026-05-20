@@ -37,6 +37,26 @@ final class CompatibilityLogger
         error_log('[ACME Compatibility] ' . $message);
     }
 
+
+    /**
+     * Registra o uso de uma função pública antiga mantida por compatibilidade.
+     *
+     * Objetivo:
+     * Medir uso real de wrappers antes de qualquer remoção futura, sem alterar
+     * assinatura, retorno ou comportamento da função antiga.
+     *
+     * @param string $functionName Nome da função global observada.
+     * @param string $replacement  Implementação moderna recomendada.
+     */
+    public static function deprecatedFunctionUsed(string $functionName, string $replacement): void
+    {
+        self::log(sprintf(
+            'Deprecated function used: %s. Replacement: %s',
+            $functionName,
+            $replacement
+        ));
+    }
+
     /**
      * Registra o carregamento de um arquivo legado ainda mantido por compatibilidade.
      *

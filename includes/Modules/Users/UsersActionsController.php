@@ -10,12 +10,87 @@ add_action('admin_post_acme_fe_set_password', 'acme_controller_set_password');
 add_action('admin_post_acme_fe_update_phone', 'acme_controller_update_phone');
 add_action('admin_post_acme_fe_create_user', 'acme_controller_create_user');
 
-function acme_controller_toggle_status() { acme_fe_toggle_status(); }
-function acme_controller_bulk_activate() { acme_fe_bulk_activate(); }
-function acme_controller_bulk_deactivate() { acme_fe_bulk_deactivate(); }
-function acme_controller_set_password() { acme_fe_set_password(); }
-function acme_controller_update_phone() { acme_fe_update_phone(); }
-function acme_controller_create_user() { acme_users_registration_handle_create_user(); }
+/**
+ * @deprecated 3.0.0 Use acme_fe_toggle_status() instead.
+ *
+ * Wrapper mantido porque o hook público admin_post_acme_fe_toggle_status ainda
+ * depende desse callback. Ele registra uso temporário e delega sem alterar o
+ * comportamento original.
+ */
+function acme_controller_toggle_status()
+{
+    do_action('deprecated_function_run', __FUNCTION__, '3.0.0', 'acme_fe_toggle_status');
+    \Acme\AccountControl\Support\CompatibilityLogger::deprecatedFunctionUsed(__FUNCTION__, 'acme_fe_toggle_status');
+
+    acme_fe_toggle_status();
+}
+
+/**
+ * @deprecated 3.0.0 Use acme_fe_bulk_activate() instead.
+ *
+ * Preserva compatibilidade com o callback registrado em admin_post enquanto o
+ * fluxo real permanece na implementação moderna existente.
+ */
+function acme_controller_bulk_activate()
+{
+    do_action('deprecated_function_run', __FUNCTION__, '3.0.0', 'acme_fe_bulk_activate');
+    \Acme\AccountControl\Support\CompatibilityLogger::deprecatedFunctionUsed(__FUNCTION__, 'acme_fe_bulk_activate');
+
+    acme_fe_bulk_activate();
+}
+
+/**
+ * @deprecated 3.0.0 Use acme_fe_bulk_deactivate() instead.
+ *
+ * Mantido temporariamente para evitar quebra de integrações ou snippets que
+ * chamem o callback antigo diretamente.
+ */
+function acme_controller_bulk_deactivate()
+{
+    do_action('deprecated_function_run', __FUNCTION__, '3.0.0', 'acme_fe_bulk_deactivate');
+    \Acme\AccountControl\Support\CompatibilityLogger::deprecatedFunctionUsed(__FUNCTION__, 'acme_fe_bulk_deactivate');
+
+    acme_fe_bulk_deactivate();
+}
+
+/**
+ * @deprecated 3.0.0 Use acme_fe_set_password() instead.
+ *
+ * Compatibilidade pública preservada para o hook admin_post correspondente.
+ */
+function acme_controller_set_password()
+{
+    do_action('deprecated_function_run', __FUNCTION__, '3.0.0', 'acme_fe_set_password');
+    \Acme\AccountControl\Support\CompatibilityLogger::deprecatedFunctionUsed(__FUNCTION__, 'acme_fe_set_password');
+
+    acme_fe_set_password();
+}
+
+/**
+ * @deprecated 3.0.0 Use acme_fe_update_phone() instead.
+ *
+ * Compatibilidade pública preservada para o hook admin_post correspondente.
+ */
+function acme_controller_update_phone()
+{
+    do_action('deprecated_function_run', __FUNCTION__, '3.0.0', 'acme_fe_update_phone');
+    \Acme\AccountControl\Support\CompatibilityLogger::deprecatedFunctionUsed(__FUNCTION__, 'acme_fe_update_phone');
+
+    acme_fe_update_phone();
+}
+
+/**
+ * @deprecated 3.0.0 Use acme_users_registration_handle_create_user() instead.
+ *
+ * Mantido para não quebrar o callback público de criação de usuário.
+ */
+function acme_controller_create_user()
+{
+    do_action('deprecated_function_run', __FUNCTION__, '3.0.0', 'acme_users_registration_handle_create_user');
+    \Acme\AccountControl\Support\CompatibilityLogger::deprecatedFunctionUsed(__FUNCTION__, 'acme_users_registration_handle_create_user');
+
+    acme_users_registration_handle_create_user();
+}
 
 if (!function_exists('acme_fe_toggle_status')) {
     function acme_fe_toggle_status()
