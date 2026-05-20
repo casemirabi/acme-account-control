@@ -43,30 +43,24 @@ if (!function_exists('acme_handle_admin_grant_credits')) {
     }
 
     // ===== slug -> service_id =====
+    // O controller não executa SQL diretamente: delega a consulta ao Repository
+    // para reduzir o legado procedural sem alterar o contrato público do POST.
     global $wpdb;
-    $servicesT = acme_table_services();
-
-    $service_id = (int) $wpdb->get_var($wpdb->prepare(
-      "SELECT id FROM {$servicesT} WHERE slug=%s LIMIT 1",
-      $service_slug
-    ));
+    $serviceRepository = new \Acme\AccountControl\Models\ServiceRepository($wpdb);
+    $service = $serviceRepository->findBySlug($service_slug);
+    $service_id = $service ? (int) $service->id : 0;
 
     if ($service_id <= 0) {
       wp_die('Serviço inválido (slug não encontrado).');
     }
 
         // ===== VALIDA STATUS DO USUÁRIO ALVO =====
-    $statusT = acme_table_status();
-
-    $target_status = $wpdb->get_var($wpdb->prepare(
-      "SELECT status
-       FROM {$statusT}
-       WHERE user_id = %d
-       LIMIT 1",
-      $user_id
-    ));
-
-    $target_status = $target_status ? (string) $target_status : 'active';
+    // Mantém a regra de compatibilidade existente, mas remove a query direta
+    // deste controller. A migração completa do repository de usuários fica para
+    // um lote separado, reduzindo o risco de regressão.
+    $target_status = function_exists('acme_users_repo_get_status')
+      ? acme_users_repo_get_status($user_id)
+      : 'active';
 
     if ($target_status !== 'active') {
       $back = wp_get_referer() ?: admin_url('admin.php?page=acme_credits');
@@ -255,13 +249,12 @@ if (!function_exists('acme_handle_recover_credits')) {
       wp_die('Parâmetros inválidos.');
     }
 
+    // O controller reaproveita o Repository para resolver o serviço por slug,
+    // removendo SQL procedural residual deste fluxo de recuperação.
     global $wpdb;
-    $servicesT = acme_table_services();
-
-    $service_id = (int) $wpdb->get_var($wpdb->prepare(
-      "SELECT id FROM {$servicesT} WHERE slug=%s LIMIT 1",
-      $service_slug
-    ));
+    $serviceRepository = new \Acme\AccountControl\Models\ServiceRepository($wpdb);
+    $service = $serviceRepository->findBySlug($service_slug);
+    $service_id = $service ? (int) $service->id : 0;
 
     if ($service_id <= 0) {
       wp_die('Serviço inválido (slug não encontrado).');
