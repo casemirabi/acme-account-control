@@ -15,8 +15,8 @@ includes/services/credits-transactions-module.php
 
 Os arquivos removidos foram classificados como **baixo risco** porque:
 
-1. não estavam no manifesto central `config/legacy-files.php`;
-2. não estavam no manifesto agrupado `config/hook-files.php`;
+1. não estavam no manifesto central `config/hook-files.php`;
+2. não possuíam referências ativas no carregamento principal;
 3. não eram carregados pelo bootstrap principal;
 4. não possuíam referência ativa fora deles mesmos;
 5. tinham responsabilidades já cobertas por arquivos ativos da camada atual.

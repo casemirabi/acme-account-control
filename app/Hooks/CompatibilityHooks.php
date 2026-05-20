@@ -17,15 +17,15 @@ namespace Acme\AccountControl\Hooks;
  */
 final class CompatibilityHooks
 {
-    /** @var LegacyHookRegistry */
-    private $legacyHookRegistry;
+    /** @var HookFileLoader */
+    private $hookFileLoader;
 
     /**
-     * @param array<int, array{path:string, required:bool}> $legacyFiles
+     * @param array<int, array{path:string, required:bool}> $hookFiles
      */
-    public function __construct(string $pluginPath, array $legacyFiles)
+    public function __construct(string $pluginPath, array $hookFiles)
     {
-        $this->legacyHookRegistry = new LegacyHookRegistry($pluginPath, $legacyFiles);
+        $this->hookFileLoader = new HookFileLoader($pluginPath, $hookFiles);
     }
 
     /**
@@ -33,6 +33,6 @@ final class CompatibilityHooks
      */
     public function register(): void
     {
-        $this->legacyHookRegistry->register();
+        $this->hookFileLoader->register();
     }
 }

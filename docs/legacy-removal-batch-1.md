@@ -17,7 +17,6 @@ includes/services/users-status-service.php
 
 Esses arquivos eram aliases/documentos legados do módulo Users e não faziam parte dos manifestos ativos de carregamento:
 
-- `config/legacy-files.php`
 - `config/hook-files.php`
 
 As implementações reais continuam preservadas em:

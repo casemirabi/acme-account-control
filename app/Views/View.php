@@ -87,8 +87,8 @@ final class View
      */
     public function renderLegacy(string $relativePath, array $data = []): void
     {
-        $legacyFile = $this->resolveLegacyPath($relativePath);
-        $this->includeFile($legacyFile, $data);
+        $hookFile = $this->resolveLegacyPath($relativePath);
+        $this->includeFile($hookFile, $data);
     }
 
     /**

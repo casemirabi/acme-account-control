@@ -23,7 +23,7 @@ Isso reduz o acoplamento do bootstrap principal e torna mais fácil localizar on
 
 ## Garantia de compatibilidade
 
-O arquivo `tests/Regression/HookManifestTest.php` compara o manifesto antigo (`config/legacy-files.php`) com o manifesto agrupado (`config/hook-files.php`).
+O arquivo `tests/Regression/HookManifestTest.php` valida o manifesto único `config/hook-files.php`, garantindo caminhos críticos, ausência de duplicidade e remoção do manifesto legado duplicado.
 
 Esse teste garante que a nova organização continue carregando os mesmos arquivos, na mesma ordem, evitando regressões causadas por ordem de `require_once`.
 

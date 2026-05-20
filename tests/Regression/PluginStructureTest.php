@@ -39,11 +39,11 @@ foreach ([
     'acme-account-control.php',
     'app/Bootstrap.php',
     'app/Hooks/ActivationHooks.php',
-    'app/Hooks/LegacyHookRegistry.php',
+    'app/Hooks/HookFileLoader.php',
     'app/Helpers/SafeRequire.php',
     'app/Services/VendorLoader.php',
     'config/constants.php',
-    'config/legacy-files.php',
+    'config/hook-files.php',
 ] as $requiredFile) {
     $assertFileExists($requiredFile);
 }
@@ -54,8 +54,9 @@ $assertContains('config/constants.php', 'ACME_ACC_PATH');
 $assertContains('config/constants.php', 'ACME_CLT_BRIDGE_URL');
 $assertContains('app/Hooks/ActivationHooks.php', 'acme_services_activate');
 $assertContains('app/Hooks/ActivationHooks.php', 'acme_inss_activate');
-$assertContains('config/legacy-files.php', 'includes/controllers/clt-async.php');
-$assertContains('config/legacy-files.php', 'includes/controllers/api-consumers-frontend.php');
+$assertContains('config/hook-files.php', 'includes/controllers/clt-async.php');
+$assertContains('config/hook-files.php', 'includes/controllers/api-consumers-frontend.php');
+$assertContains('app/Hooks/HookFileLoader.php', 'final class HookFileLoader');
 
 if ($failures !== []) {
     fwrite(STDERR, "Falhas de regressão:

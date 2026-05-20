@@ -69,7 +69,6 @@ $activeUsersFiles = [
 
 foreach ($removedLegacyFiles as $removedLegacyFile) {
     $assertFileMissing($removedLegacyFile);
-    $assertNotContains('config/legacy-files.php', $removedLegacyFile);
     $assertNotContains('config/hook-files.php', $removedLegacyFile);
 }
 

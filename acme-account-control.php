@@ -42,7 +42,7 @@ require_once __DIR__ . '/app/Models/CreditRepository.php';
 require_once __DIR__ . '/app/Services/CreditTransactionService.php';
 require_once __DIR__ . '/app/Services/CreditGrantService.php';
 require_once __DIR__ . '/app/Hooks/ActivationHooks.php';
-require_once __DIR__ . '/app/Hooks/LegacyHookRegistry.php';
+require_once __DIR__ . '/app/Hooks/HookFileLoader.php';
 require_once __DIR__ . '/app/Hooks/CompatibilityHooks.php';
 require_once __DIR__ . '/app/Hooks/UserHooks.php';
 require_once __DIR__ . '/app/Hooks/AdminHooks.php';

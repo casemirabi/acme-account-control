@@ -17,7 +17,7 @@ declare(strict_types=1);
  *   ausência em instalações diferentes.
  *
  * Importante:
- * Alguns arquivos legados ainda misturam shortcodes, actions, filtros e funções
+ * Alguns arquivos de hooks ainda misturam shortcodes, actions, filtros e funções
  * auxiliares. Eles foram colocados no grupo que representa seu contrato público
  * mais relevante. A separação fina será feita nas próximas etapas, quando a regra
  * de negócio migrar para Controllers, Services e Models.

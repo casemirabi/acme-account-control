@@ -13,7 +13,7 @@ namespace Acme\AccountControl\Hooks;
  * frontend, REST API, AJAX, cron ou compatibilidade legada.
  *
  * Motivo da implementação:
- * O plugin ainda possui arquivos legados que registram hooks no momento do
+ * O plugin ainda possui arquivos de hooks que registram hooks no momento do
  * `require_once`. Em vez de mover toda regra de uma vez, esta classe organiza o
  * carregamento por grupos funcionais. Isso melhora localização e manutenção sem
  * alterar nomes públicos, slugs, endpoints, actions ou shortcodes existentes.
@@ -68,7 +68,7 @@ final class HookRegistrar
      *
      * Mantemos fallback para array vazio porque alguns ambientes podem remover
      * módulos opcionais. A obrigatoriedade real de cada arquivo continua sendo
-     * respeitada dentro de LegacyHookRegistry.
+     * respeitada dentro de HookFileLoader.
      *
      * @return array<int, array{path:string, required:bool}>
      */

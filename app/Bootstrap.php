@@ -68,7 +68,7 @@ final class Bootstrap
     /**
      * Registra hooks do WordPress por grupos funcionais.
      *
-     * Esta camada mantém compatibilidade com arquivos legados, mas substitui o
+     * Esta camada mantém compatibilidade com arquivos de hooks, mas substitui o
      * carregamento genérico por uma organização explícita em Admin, Frontend,
      * REST API, AJAX, Cron, Users, Reports e compatibilidade.
      */

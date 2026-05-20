@@ -12,7 +12,6 @@ app/
   Views/        # Templates HTML/PHP.
 config/
   constants.php     # Constantes preservadas do plugin legado.
-  legacy-files.php  # Manifesto centralizado de includes legados.
 tests/
   Regression/       # Testes de regressão estruturais.
 ```
