@@ -5,31 +5,46 @@ declare(strict_types=1);
 namespace Acme\AccountControl\Models;
 
 /**
- * Repositório de créditos do ACME.
+ * Fachada de persistência do módulo de créditos.
  *
  * Objetivo:
- * Concentrar queries relacionadas a serviços, carteiras e transações de crédito.
+ * Preservar a API interna criada na etapa anterior (`CreditRepository`) enquanto
+ * separamos as responsabilidades reais em repositórios menores:
+ * - ServiceRepository
+ * - WalletRepository
+ * - CreditTransactionRepository
+ * - DatabaseTransactionManager
  *
  * Motivo da implementação:
- * O plugin legado executava SQL diretamente dentro de funções globais de serviço.
- * Ao isolar a persistência neste Model, reduzimos acoplamento e deixamos as
- * regras de negócio mais fáceis de testar e manter.
+ * Esta abordagem reduz risco na refatoração. Os Services já dependiam de
+ * `CreditRepository`; trocar tudo de uma vez aumentaria chance de regressão. A
+ * fachada mantém compatibilidade e delega o trabalho para Models específicos.
  *
  * Compatibilidade:
- * Esta classe usa as mesmas tabelas resolvidas pelas funções legadas
- * `acme_table_services()`, `acme_table_wallet()` e
- * `acme_table_credit_transactions()`. Isso preserva nomes de tabelas, schema,
- * queries e comportamento atual.
+ * Métodos públicos existentes foram mantidos para não quebrar wrappers legados
+ * como `acme_credits_grant()`, `acme_wallet_get()` e `acme_service_get_by_slug()`.
  *
- * Risco:
- * As queries ainda dependem do objeto global `$wpdb` e das funções de tabela do
- * WordPress/ACME. Por isso, este Model deve ser carregado somente após o núcleo
- * do WordPress estar disponível e após `includes/support/helpers.php`.
+ * Próximo passo:
+ * Quando o plugin estiver totalmente coberto por testes, os Services podem
+ * passar a depender diretamente dos repositórios específicos, removendo esta
+ * fachada gradualmente.
  */
 final class CreditRepository
 {
     /** @var \wpdb */
     private $wpdb;
+
+    /** @var ServiceRepository */
+    private $serviceRepository;
+
+    /** @var WalletRepository */
+    private $walletRepository;
+
+    /** @var CreditTransactionRepository */
+    private $transactionRepository;
+
+    /** @var DatabaseTransactionManager */
+    private $transactionManager;
 
     /**
      * @param \wpdb $wpdb Instância global do banco de dados do WordPress.
@@ -37,13 +52,17 @@ final class CreditRepository
     public function __construct($wpdb)
     {
         $this->wpdb = $wpdb;
+        $this->serviceRepository = new ServiceRepository($wpdb);
+        $this->walletRepository = new WalletRepository($wpdb);
+        $this->transactionRepository = new CreditTransactionRepository($wpdb);
+        $this->transactionManager = new DatabaseTransactionManager($wpdb);
     }
 
     /**
      * Retorna detalhes técnicos do último erro SQL.
      *
-     * Mantemos este método para preservar a mensagem diagnóstica usada pelo
-     * legado em falhas de transação, sem espalhar acesso ao `$wpdb` nos Services.
+     * Mantemos este método centralizado para preservar diagnóstico sem espalhar
+     * acesso direto ao `$wpdb` pelos Services.
      */
     public function describeLastDatabaseError(string $context): string
     {
@@ -56,76 +75,51 @@ final class CreditRepository
     /**
      * Busca um serviço pelo slug público.
      *
-     * IMPORTANTE:
-     * O slug é contrato público usado por shortcodes, telas e integrações. A
-     * query foi preservada para evitar qualquer mudança de comportamento.
-     *
      * @return object|null
      */
     public function findServiceBySlug(string $slug)
     {
-        $servicesTable = acme_table_services();
-
-        return $this->wpdb->get_row(
-            $this->wpdb->prepare(
-                "SELECT id, slug, name, credits_cost FROM {$servicesTable} WHERE slug=%s LIMIT 1",
-                $slug
-            )
-        );
+        return $this->serviceRepository->findBySlug($slug);
     }
 
     /**
      * Busca dados mínimos de serviço pelo ID.
      *
-     * Usado para preencher `service_slug` e `service_name` automaticamente ao
-     * registrar transações, mantendo compatibilidade com relatórios existentes.
-     *
      * @return object|null
      */
     public function findServiceIdentityById(int $serviceId)
     {
-        $servicesTable = acme_table_services();
+        return $this->serviceRepository->findIdentityById($serviceId);
+    }
 
-        return $this->wpdb->get_row(
-            $this->wpdb->prepare(
-                "SELECT slug, name FROM {$servicesTable} WHERE id = %d LIMIT 1",
-                $serviceId
-            )
-        );
+    /**
+     * Lista serviços para selects administrativos.
+     *
+     * @return array<int, object>
+     */
+    public function listServicesForSelection(): array
+    {
+        return $this->serviceRepository->listForSelection();
     }
 
     /**
      * Lê a carteira de créditos de um usuário para um serviço.
      *
-     * A relação `master_user_id + service_id` foi mantida exatamente como no
-     * legado para não alterar regras de saldo ou relatórios existentes.
-     *
      * @return object|null
      */
     public function findWallet(int $userId, int $serviceId)
     {
-        $walletTable = acme_table_wallet();
-
-        return $this->wpdb->get_row(
-            $this->wpdb->prepare(
-                "SELECT * FROM {$walletTable} WHERE master_user_id=%d AND service_id=%d LIMIT 1",
-                $userId,
-                $serviceId
-            )
-        );
+        return $this->walletRepository->findByUserAndService($userId, $serviceId);
     }
 
     /**
      * Insere uma nova carteira de créditos.
      *
-     * Retorna `false` em falha para preservar a semântica do `$wpdb->insert()` e
-     * permitir rollback na camada de Service.
-     *
      * @return int|false
      */
     public function insertWallet(array $walletData)
     {
-        return $this->wpdb->insert(acme_table_wallet(), $walletData);
+        return $this->walletRepository->insert($walletData);
     }
 
     /**
@@ -135,20 +129,17 @@ final class CreditRepository
      */
     public function updateWallet(int $walletId, array $walletData)
     {
-        return $this->wpdb->update(acme_table_wallet(), $walletData, ['id' => $walletId]);
+        return $this->walletRepository->update($walletId, $walletData);
     }
 
     /**
      * Insere uma transação de crédito.
      *
-     * A estrutura do array recebido segue o schema legado da tabela de
-     * transações, incluindo campos usados por relatórios e auditoria.
-     *
      * @return int|false
      */
     public function insertCreditTransaction(array $transactionData)
     {
-        return $this->wpdb->insert(acme_table_credit_transactions(), $transactionData);
+        return $this->transactionRepository->insert($transactionData);
     }
 
     /**
@@ -161,15 +152,10 @@ final class CreditRepository
 
     /**
      * Inicia transação SQL manual.
-     *
-     * IMPORTANTE:
-     * O WordPress não possui abstração nativa completa para transações. Como o
-     * legado já usava SQL direto, mantemos o mesmo comportamento para evitar
-     * mudança de atomicidade durante concessão de créditos.
      */
     public function startTransaction(): void
     {
-        $this->wpdb->query('START TRANSACTION');
+        $this->transactionManager->begin();
     }
 
     /**
@@ -177,7 +163,7 @@ final class CreditRepository
      */
     public function commit(): void
     {
-        $this->wpdb->query('COMMIT');
+        $this->transactionManager->commit();
     }
 
     /**
@@ -185,7 +171,7 @@ final class CreditRepository
      */
     public function rollback(): void
     {
-        $this->wpdb->query('ROLLBACK');
+        $this->transactionManager->rollback();
     }
 
     /**

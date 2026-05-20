@@ -129,3 +129,49 @@ Migrar gradualmente os fluxos de distribuição e transferência de créditos:
 - `includes/controllers/credits-frontend.php`
 
 Esses arquivos dependem do motor de créditos e devem ser movidos somente depois de validar concessão e auditoria em ambiente WordPress real.
+
+## Etapa 6 — Extração inicial de Models/Repositories
+
+Nesta etapa, a persistência do módulo de créditos foi dividida em repositórios menores, mantendo `CreditRepository` como fachada de compatibilidade.
+
+### Arquivos criados
+
+- `app/Models/ServiceRepository.php`
+  - Centraliza consultas da tabela de serviços.
+  - Preserva busca por slug, identidade por ID e listagem para seleção.
+
+- `app/Models/WalletRepository.php`
+  - Centraliza leitura e escrita de carteiras de crédito.
+  - Mantém a chave lógica `master_user_id + service_id` usada pelo legado.
+
+- `app/Models/CreditTransactionRepository.php`
+  - Centraliza inserts na tabela de transações de crédito.
+  - Preserva o schema usado por relatórios e auditoria.
+
+- `app/Models/DatabaseTransactionManager.php`
+  - Centraliza `START TRANSACTION`, `COMMIT` e `ROLLBACK`.
+  - Deve ser usado apenas em fluxos críticos, como concessão de créditos.
+
+### Decisão de compatibilidade
+
+`CreditRepository` continua existindo porque `CreditGrantService`, `CreditTransactionService` e wrappers legados já dependem dele.
+Em vez de remover essa classe, ela agora atua como fachada simples para os repositórios específicos.
+
+Essa decisão evita mudanças bruscas e reduz risco de regressão.
+
+### Fluxo atual
+
+```text
+Funções legadas
+  → Services
+    → CreditRepository [fachada]
+      → ServiceRepository
+      → WalletRepository
+      → CreditTransactionRepository
+      → DatabaseTransactionManager
+```
+
+### O que ainda permanece legado
+
+Ainda existem queries espalhadas em arquivos de shortcodes, relatórios e integrações assíncronas.
+A migração deve continuar por domínio, priorizando baixo risco e testes de regressão.
