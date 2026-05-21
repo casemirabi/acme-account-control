@@ -59,6 +59,7 @@ add_action('rest_api_init', function () {
       if ($apiKey !== '' && function_exists('acme_validate_api_key')) {
         $consumerData = acme_validate_api_key($apiKey, 'inss');
 
+
         if (!is_wp_error($consumerData)) {
           return true;
         }
@@ -95,6 +96,7 @@ add_action('rest_api_init', function () {
 
       if ($apiKey !== '' && function_exists('acme_validate_api_key')) {
         $consumerData = acme_validate_api_key($apiKey, 'inss');
+
 
         if (!is_wp_error($consumerData)) {
           return true;
@@ -319,20 +321,48 @@ if (!function_exists('acme_mask_beneficio')) {
 if (!function_exists('acme_resolve_authenticated_user_id')) {
   function acme_resolve_authenticated_user_id(WP_REST_Request $req): int
   {
-    $userId = (int) get_current_user_id();
-    if ($userId > 0) {
-      return $userId;
+    // Primeiro tenta usar o usuário logado no WordPress.
+    $currentUserId = (int) get_current_user_id();
+
+    if ($currentUserId > 0) {
+      return $currentUserId;
     }
 
+    // Busca a chave enviada no header x-acme-key.
     $apiKey = function_exists('acme_get_api_key_from_request')
       ? acme_get_api_key_from_request($req)
       : (string) $req->get_header('x-acme-key');
-    if ($apiKey !== '' && function_exists('acme_validate_api_key')) {
-      $consumerData = acme_validate_api_key($apiKey, 'inss');
 
-      if (!is_wp_error($consumerData)) {
-        return true;
-      }
+    $apiKey = trim($apiKey);
+
+    if ($apiKey === '') {
+      error_log('[ACME INSS AUTH] Header x-acme-key não recebido.');
+      return 0;
+    }
+
+    if (!function_exists('acme_validate_api_key')) {
+      error_log('[ACME INSS AUTH] Função acme_validate_api_key não existe.');
+      return 0;
+    }
+
+    // Valida a API key para o serviço INSS.
+    $consumerData = acme_validate_api_key($apiKey, 'inss');
+
+    if (is_wp_error($consumerData)) {
+      error_log('[ACME INSS AUTH] Erro ao validar API key: ' . $consumerData->get_error_message());
+      return 0;
+    }
+
+    error_log('[ACME INSS AUTH] consumerData: ' . print_r($consumerData, true));
+
+    // Garante compatibilidade com possíveis nomes diferentes de campo.
+    if (is_array($consumerData)) {
+      return (int) (
+        $consumerData['wp_user_id']
+        ?? $consumerData['user_id']
+        ?? $consumerData['usuario_id']
+        ?? 0
+      );
     }
 
     return 0;
@@ -647,9 +677,25 @@ function acme_api_inss_status(WP_REST_Request $req)
     return acme_err(400, 'request_id obrigatório', 'MISSING_REQUEST_ID');
   }
 
-  $userId = acme_resolve_authenticated_user_id($req);
+  // $userId = acme_resolve_authenticated_user_id($req);
+  // if ($userId <= 0) {
+  //   return acme_err(401, 'Você precisa estar logado ou informar uma API key válida ' . $userId . ' . ', 'NOT_AUTHENTICATED');
+  // }
+  // Resolve autenticação por sessão WordPress ou API key.
+  $authContext = acme_resolve_authenticated_user_context($req);
+
+  if (is_wp_error($authContext)) {
+    return acme_err(
+      (int) ($authContext->get_error_data()['status'] ?? 401),
+      $authContext->get_error_message(),
+      strtoupper((string) $authContext->get_error_code())
+    );
+  }
+
+  $userId = (int) ($authContext['user_id'] ?? 0);
+
   if ($userId <= 0) {
-    return acme_err(401, 'Você precisa estar logado ou informar uma API key válida.', 'NOT_AUTHENTICATED');
+    return acme_err(401, 'Você precisa estar logado ou informar uma API key válida ' . $userId . ' . ', 'NOT_AUTHENTICATED');
   }
 
   $requestsTable = $wpdb->prefix . 'service_requests';
@@ -681,6 +727,11 @@ function acme_api_inss_status(WP_REST_Request $req)
     $responseData = is_array($decodedResponse) ? $decodedResponse : null;
   }
 
+// Cria um token assinado e temporário para acesso ao PDF.
+$pdfUrl = rest_url(
+  'acme/v1/inss-pdf/' . rawurlencode((string) $row['request_id'])
+);
+
   $data = [
     'request_id'          => (string) $row['request_id'],
     'provider_request_id' => $row['provider_request_id'] ?? null,
@@ -689,7 +740,8 @@ function acme_api_inss_status(WP_REST_Request $req)
     'created_at'          => $row['created_at'] ?? null,
     'updated_at'          => $row['updated_at'] ?? null,
     'completed_at'        => $row['completed_at'] ?? null,
-  ];
+    'url_pdf'             => $pdfUrl,
+    ];
 
   if ($row['status'] === 'completed') {
     $data['response_data'] = $responseData;
@@ -820,6 +872,10 @@ if (!function_exists('acme_resolve_authenticated_user_context')) {
     $apiKey = function_exists('acme_get_api_key_from_request')
       ? acme_get_api_key_from_request($req)
       : (string) $req->get_header('x-acme-key');
+    $apiKey = trim($apiKey);
+
+    error_log('[ACME AUTH] apiKey recebida: ' . substr($apiKey, 0, 16));
+    error_log('[ACME AUTH] hash recebido: ' . hash('sha256', $apiKey));
 
     if ($apiKey === '') {
       return new WP_Error(
@@ -838,6 +894,7 @@ if (!function_exists('acme_resolve_authenticated_user_context')) {
     }
 
     $consumerData = acme_validate_api_key($apiKey, 'inss');
+
     if (is_wp_error($consumerData)) {
       return $consumerData;
     }

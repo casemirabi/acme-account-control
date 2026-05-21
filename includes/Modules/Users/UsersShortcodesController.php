@@ -141,7 +141,7 @@ if (!function_exists('acme_shortcode_my_grandchildren_manage')) {
 
         ob_start();
         echo function_exists('acme_ui_panel_css') ? acme_ui_panel_css() : '';
-        require dirname(__FILE__) . '/Views/manage-grandchildren.php';
+        require ACME_ACC_PATH . 'app/Views/users/manage-grandchildren.php';
         return ob_get_clean();
     }
 }
@@ -475,10 +475,10 @@ function acme_shortcode_view_user()
             <!-- CONTEÚDO -->
             <table style="width:100%;border-collapse:collapse">
                 <tbody>
-                    <tr>
+                    <!--<tr>
                         <td style="padding:10px;border-bottom:1px solid #eee;width:220px"><strong>ID</strong></td>
-                        <td style="padding:10px;border-bottom:1px solid #eee"><?php echo (int) $u->ID; ?></td>
-                    </tr>
+                        <td style="padding:10px;border-bottom:1px solid #eee"><?php #echo (int) $u->ID; ?></td>
+                    </tr>-->
                     <tr>
                         <td style="padding:10px;border-bottom:1px solid #eee"><strong>Nome</strong></td>
                         <td style="padding:10px;border-bottom:1px solid #eee"><?php echo esc_html($u->display_name); ?></td>
@@ -931,10 +931,10 @@ function acme_shortcode_view_user_atual()
 
         <table style="width:100%;border-collapse:collapse">
             <tbody>
-                <tr>
+                <!-- <tr>
                     <td style="padding:10px;border-bottom:1px solid #eee;width:220px"><strong>ID</strong></td>
-                    <td style="padding:10px;border-bottom:1px solid #eee"><?php echo (int) $u->ID; ?></td>
-                </tr>
+                    <td style="padding:10px;border-bottom:1px solid #eee"><?php #echo (int) $u->ID; ?></td>
+                </tr> -->
                 <tr>
                     <td style="padding:10px;border-bottom:1px solid #eee"><strong>Nome</strong></td>
                     <td style="padding:10px;border-bottom:1px solid #eee"><?php echo esc_html($u->display_name); ?></td>

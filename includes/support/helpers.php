@@ -952,7 +952,7 @@ add_action('wp_ajax_acme_inss_pdf_request', function () {
   acme_pdf_stream_html($html, 'consulta-inss-' . $requestId . '.pdf');*/
 
   try {
-    require_once ACME_PLUGIN_DIR . 'includes/services/InssTcpdfService.php';
+    require_once ACME_PLUGIN_DIR . 'app/Services/InssTcpdfService.php';
 
     $pdfService = new InssTcpdfService();
     $pdfService->outputPdf($row, $dados, 'consulta-inss-' . $requestId . '.pdf');
