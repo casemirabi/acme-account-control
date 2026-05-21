@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Acme\AccountControl\Hooks;
 
+use Acme\AccountControl\Controllers\Rest\InssResourceController;
+
 /**
  * Centraliza hooks e rotas REST API.
  *
@@ -34,5 +36,12 @@ final class RestApiHooks
     public function register(): void
     {
         $this->hookFileLoader->register();
+
+        // Rotas REST MVC novas. Os endpoints legados continuam carregados pelo HookFileLoader.
+        add_action('rest_api_init', static function (): void {
+            if (class_exists(InssResourceController::class)) {
+                (new InssResourceController())->registerRoutes();
+            }
+        });
     }
 }

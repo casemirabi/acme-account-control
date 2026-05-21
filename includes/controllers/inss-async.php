@@ -432,6 +432,7 @@ function acme_api_inss_start(WP_REST_Request $req)
   }
 
   $requestId = acme_make_inss_request_id();
+  $pdfPublicId = function_exists('random_bytes') ? 'pdf_' . bin2hex(random_bytes(18)) : 'pdf_' . wp_generate_uuid4();
   $requestsTable = $wpdb->prefix . 'service_requests';
 
   $serviceId = function_exists('acme_get_service_id_by_slug')
@@ -449,6 +450,7 @@ function acme_api_inss_start(WP_REST_Request $req)
     [
       'user_id'             => $userId,
       'request_id'          => $requestId,
+      'pdf_public_id'       => $pdfPublicId,
       'clt_request_id'      => wp_generate_uuid4(),
       'provider_request_id' => null,
       'service_slug'        => 'inss',
@@ -659,6 +661,9 @@ function acme_api_inss_start(WP_REST_Request $req)
     'data'    => [
       'request_id'    => $requestId,
       'status'        => 'completed',
+      'resources'     => [
+        'pdf' => rest_url('acme/v1/inss/resources/pdf/' . rawurlencode($pdfPublicId)),
+      ],
       'response_data' => $decodedResponse,
     ],
   ], 200);
@@ -717,8 +722,43 @@ function acme_api_inss_status(WP_REST_Request $req)
     return acme_err(404, 'Requisição INSS não encontrada', 'NOT_FOUND');
   }
 
-  if (!current_user_can('manage_options') && (int) $row['user_id'] !== $userId) {
+  $canAccessRequest = current_user_can('manage_options') || (int) $row['user_id'] === $userId;
+
+  if (!$canAccessRequest && class_exists('Acme\\AccountControl\\Services\\MasterAccessService')) {
+    $masterAccessService = new Acme\AccountControl\Services\MasterAccessService();
+    $canAccessRequest = $masterAccessService->canAccessUser($userId, (int) $row['user_id']);
+  }
+
+  if (!$canAccessRequest) {
+    if (class_exists('Acme\\AccountControl\\Models\\ApiAccessLogRepository')) {
+      $accessLogRepository = new Acme\AccountControl\Models\ApiAccessLogRepository();
+      $accessLogRepository->record([
+        'actor_user_id' => $userId,
+        'target_user_id' => (int) $row['user_id'],
+        'service_slug' => 'inss',
+        'provider' => 'rest',
+        'action' => 'inss.status.read',
+        'status' => 'forbidden',
+        'request_id' => (string) $row['request_id'],
+        'message' => 'Acesso negado à consulta INSS via status.',
+      ]);
+    }
+
     return acme_err(403, 'Você não tem permissão para consultar esta requisição.', 'REQUEST_NOT_OWNED_BY_USER');
+  }
+
+  if (class_exists('Acme\\AccountControl\\Models\\ApiAccessLogRepository')) {
+    $accessLogRepository = new Acme\AccountControl\Models\ApiAccessLogRepository();
+    $accessLogRepository->record([
+      'actor_user_id' => $userId,
+      'target_user_id' => (int) $row['user_id'],
+      'service_slug' => 'inss',
+      'provider' => 'rest',
+      'action' => 'inss.status.read',
+      'status' => 'success',
+      'request_id' => (string) $row['request_id'],
+      'message' => 'Consulta de status INSS via API.',
+    ]);
   }
 
   $responseData = null;
@@ -727,10 +767,16 @@ function acme_api_inss_status(WP_REST_Request $req)
     $responseData = is_array($decodedResponse) ? $decodedResponse : null;
   }
 
-// Cria um token assinado e temporário para acesso ao PDF.
-$pdfUrl = rest_url(
-  'acme/v1/inss-pdf/' . rawurlencode((string) $row['request_id'])
-);
+  $pdfUrl = null;
+
+  if (class_exists('Acme\\AccountControl\\Models\\ServiceRequestRepository')
+      && class_exists('Acme\\AccountControl\\Services\\ApiResourceLinkService')) {
+    $serviceRequestRepository = new Acme\AccountControl\Models\ServiceRequestRepository();
+    $resourceLinkService = new Acme\AccountControl\Services\ApiResourceLinkService($serviceRequestRepository);
+    $pdfUrl = $resourceLinkService->buildInssPdfUrl($row);
+  } elseif (!empty($row['pdf_public_id'])) {
+    $pdfUrl = rest_url('acme/v1/inss/resources/pdf/' . rawurlencode((string) $row['pdf_public_id']));
+  }
 
   $data = [
     'request_id'          => (string) $row['request_id'],
@@ -740,8 +786,10 @@ $pdfUrl = rest_url(
     'created_at'          => $row['created_at'] ?? null,
     'updated_at'          => $row['updated_at'] ?? null,
     'completed_at'        => $row['completed_at'] ?? null,
-    'url_pdf'             => $pdfUrl,
-    ];
+    'resources'           => [
+      'pdf' => $pdfUrl,
+    ],
+  ];
 
   if ($row['status'] === 'completed') {
     $data['response_data'] = $responseData;

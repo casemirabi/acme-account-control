@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Acme\AccountControl\Hooks;
 
+use Acme\AccountControl\Models\ApiAccessLogRepository;
+use Acme\AccountControl\Models\ServiceRequestRepository;
+
 /**
  * Centraliza as rotinas executadas na ativação do plugin.
  *
@@ -52,6 +55,16 @@ final class ActivationHooks
             if (function_exists($activationFunction)) {
                 $activationFunction();
             }
+        }
+
+        // Atualizações incrementais usadas pela API de recursos e Login Master.
+        // Mantém compatibilidade com tabelas existentes e adiciona apenas colunas/índices necessários.
+        if (class_exists(ServiceRequestRepository::class)) {
+            ServiceRequestRepository::activate();
+        }
+
+        if (class_exists(ApiAccessLogRepository::class)) {
+            ApiAccessLogRepository::activate();
         }
     }
 }
